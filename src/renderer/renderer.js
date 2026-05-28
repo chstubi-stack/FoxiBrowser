@@ -715,16 +715,19 @@ function showCtxMenu(x, y, hasText, editable) {
 
 function hideCtxMenu() { ctxMenu.classList.add('hidden'); }
 
+// Letzte Mausposition beim Rechtsklick merken (mousedown feuert im Renderer-Kontext)
+let lastRightClickX = 0;
+let lastRightClickY = 0;
+webview.addEventListener('mousedown', e => {
+  if (e.button === 2) { lastRightClickX = e.clientX; lastRightClickY = e.clientY; }
+});
+
 // Rechtsklick auf Webview
 webview.addEventListener('context-menu', e => {
   e.preventDefault();
   if (isHome) return;
-  const rect   = webview.getBoundingClientRect();
   const params = e.params || {};
-  // params.x/y sind Viewport-Koordinaten innerhalb des Webviews
-  const x = rect.left + (params.x || 0);
-  const y = rect.top  + (params.y || 0);
-  showCtxMenu(x, y,
+  showCtxMenu(lastRightClickX, lastRightClickY,
     !!params.selectionText,
     !!params.isEditable
   );
