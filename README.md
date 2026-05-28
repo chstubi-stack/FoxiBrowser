@@ -48,10 +48,18 @@ FoxiBrowser/
 │       ├── icon.png               # Generiert aus SVG (256×256)
 │       └── icon.ico               # Generiert aus SVG (alle Größen)
 │
-└── scripts/
-    ├── fetch-blocklists.js        # Lädt Steven Black Hosts-Liste neu herunter
-    ├── generate-icons.js          # Erzeugt icon.png + icon.ico aus icon.svg
-    └── after-pack.js              # afterPack-Hook: bettet Icon in EXE ein (rcedit)
+├── scripts/
+│   ├── fetch-blocklists.js        # Lädt Steven Black Hosts-Liste neu herunter
+│   ├── generate-icons.js          # Erzeugt icon.png + icon.ico aus icon.svg
+│   ├── after-pack.js              # afterPack-Hook: bettet Icon in EXE ein (rcedit)
+│   └── deploy-website.js          # SFTP-Upload der Website auf Hetzner (NICHT in Git)
+│
+└── website/                       # Marketing-Website (NICHT in Git – nur lokal)
+    ├── index.html                 # Startseite mit GitHub-API (Version, Downloads)
+    ├── style.css                  # Website-Styles
+    ├── impressum.html             # Impressum (§5 TMG)
+    ├── favicon.ico / favicon.png  # Kopiert aus src/assets/
+    └── images/                    # Screenshots (1.png – 6.png)
 ```
 
 ---
@@ -76,7 +84,7 @@ FoxiBrowser/
 2. **Cloudflare for Families DoH** – DNS-Blocking von Adult + Malware (1.1.1.3)
 3. **@ghostery/adblocker-electron** – Werbung + Tracker (7 Filterlisten, siehe unten)
 4. **webview in separatem Prozess** – `partition="persist:child"`, `contextIsolation=true`
-5. **Kein Popup, kein neues Fenster** – `allowpopups="false"`, `setWindowOpenHandler` → deny
+5. **Popup nur mit Eltern-PIN** – `setWindowOpenHandler` → deny, PIN-Dialog → echtes Kind-Fenster mit `persist:child` Session
 
 ### Werbeblocker-Filterlisten
 
@@ -134,6 +142,19 @@ Erscheint bei Rechtsklick auf eine geöffnete Webseite:
 | Neu laden | `F5` | – |
 
 Menü schließt sich bei Linksklick irgendwo, Escape oder Navigation.
+
+### Popup-Fenster (PIN-geschützt)
+
+- Webseiten die ein Popup öffnen wollen → PIN-Dialog erscheint
+- Nach korrekter Eltern-PIN öffnet sich ein echtes Kind-Fenster (eigene `persist:child` Session)
+- OAuth-Logins (z.B. Google bei YouTube Kids) funktionieren vollständig durch
+- Popup-Fenster schließt sich automatisch nach dem OAuth-Redirect
+- Ohne PIN → Popup wird blockiert
+
+### Website-Link im Eltern-Bereich
+
+- Footer des Eltern-Panels zeigt 🌐 foxibrowser.de
+- Klick öffnet die Website im Standard-Browser des Systems (`shell.openExternal`)
 
 ### Auto-Update (GitHub Releases)
 - Prüft 5 Sekunden nach dem Start auf neue Version
@@ -197,6 +218,10 @@ Alle Renderer-Aufrufe laufen über `window.foxiAPI`:
 | `onTimeLimitReached(cb)` | M→R | Event wenn Zeitlimit überschritten |
 | `onUpdateAvailable(cb)` | M→R | Update verfügbar |
 | `onUpdateDownloaded(cb)` | M→R | Update heruntergeladen + bereit |
+| `openExternal(url)` | R→M | URL im System-Browser öffnen |
+| `allowPopup(url)` | R→M | Popup nach PIN freigeben → öffnet Kind-Fenster |
+| `onPopupRequested(cb)` | M→R | Popup-Anfrage einer Webseite |
+| `onPopupRedirect(cb)` | M→R | OAuth-Redirect-URL nach Popup-Login |
 
 ---
 
@@ -219,16 +244,20 @@ npm run generate-icons
 npm run build:win
 
 # Installer bauen + als GitHub Release veröffentlichen
-$env:GH_TOKEN = "ghp_DEIN_TOKEN"
+# GH_TOKEN muss als Windows-Umgebungsvariable gesetzt sein
+$env:GH_TOKEN = [System.Environment]::GetEnvironmentVariable("GH_TOKEN", "User")
 npm run build:win -- --publish always
+
+# Website auf Hetzner deployen (SFTP)
+node scripts/deploy-website.js
 ```
 
 ### Versionsnummer erhöhen
 
 ```bash
-npm run version:patch   # 1.1.11 → 1.1.12  (Bugfix)
-npm run version:minor   # 1.1.11 → 1.2.0   (Neue Funktion)
-npm run version:major   # 1.1.11 → 2.0.0   (Großes Update)
+npm run version:patch   # 1.1.14 → 1.1.15  (Bugfix)
+npm run version:minor   # 1.1.14 → 1.2.0   (Neue Funktion)
+npm run version:major   # 1.1.14 → 2.0.0   (Großes Update)
 ```
 
 ### Kompletter Update-Workflow
