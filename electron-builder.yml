@@ -1,0 +1,50 @@
+appId: com.foxibrowser.app
+productName: FoxiBrowser
+copyright: "Copyright 2025 FoxiBrowser"
+
+directories:
+  output: build/installer
+  buildResources: src/assets
+
+files:
+  - main.js
+  - preload.js
+  - src/renderer/**/*
+  - src/blocklists/**/*
+  - src/assets/icon.png
+  - src/assets/icon.ico
+  - "!**/*.map"
+  - "!node_modules/.cache/**"
+  - "!src/assets/*.svg"
+  - "!src/assets/sounds/**"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: src/assets/icon.ico
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: FoxiBrowser
+  installerIcon: src/assets/icon.ico
+  uninstallerIcon: src/assets/icon.ico
+  deleteAppDataOnUninstall: false
+  installerLanguages:
+    - de_DE
+    - en_US
+
+afterPack: scripts/after-pack.js
+
+# Auto-Update via GitHub Releases
+# Voraussetzung: GitHub-Repo anlegen, Releases veröffentlichen, GH_TOKEN setzen
+publish:
+  provider: github
+  owner: chstubi-stack
+  repo: FoxiBrowser
+  releaseType: release
