@@ -38,7 +38,3 @@ Ein kindgerechter Desktop-Browser für Windows 10 & 11. Kostenlos, sicher und ei
 | 1.1.11 | Feature: SVG Schloss-Icon für Eltern-Button |
 | 1.1.0 | Eltern-PIN, Altersprofile, Adblocker, Rechtsklick-Menü, Auto-Updater |
 | 1.0.0 | Erstveröffentlichung |
-
----
-
-**Herausgeber:** Christoph Zibulenski · [info@z3dprint.de](mailto:info@z3dprint.de) · [foxibrowser.de](http://foxibrowser.de)
