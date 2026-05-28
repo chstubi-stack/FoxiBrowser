@@ -1,0 +1,9 @@
+node_modules/
+build/
+dist/
+src/assets/icon.png
+src/assets/icon.ico
+src/blocklists/adult.txt
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,30 @@
+{
+  "name": "foxi-browser",
+  "version": "1.1.12",
+  "description": "Ein sicherer, bunter Browser für Kinder",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "fetch-lists": "node scripts/fetch-blocklists.js",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version"
+  },
+  "dependencies": {
+    "@ghostery/adblocker-electron": "^2.0.0",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.8.3"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "rcedit": "^5.0.2",
+    "sharp": "^0.34.5",
+    "ssh2-sftp-client": "^12.1.1",
+    "to-ico": "^1.1.5"
+  },
+  "author": "FoxiBrowser",
+  "license": "MIT"
+}

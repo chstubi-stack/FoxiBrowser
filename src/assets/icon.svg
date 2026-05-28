@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Hintergrund -->
+  <rect width="256" height="256" rx="48" fill="#FF6B35"/>
+  <!-- Körper -->
+  <ellipse cx="128" cy="155" rx="72" ry="62" fill="#FF8C42"/>
+  <!-- Ohren -->
+  <path d="M56 100 Q42 55 68 40 Q62 80 84 88Z" fill="#FF6B1A"/>
+  <path d="M200 100 Q214 55 188 40 Q194 80 172 88Z" fill="#FF6B1A"/>
+  <!-- Innenohr -->
+  <path d="M62 95 Q52 65 68 52 Q66 78 82 84Z" fill="#FFD6B0"/>
+  <path d="M194 95 Q204 65 188 52 Q190 78 174 84Z" fill="#FFD6B0"/>
+  <!-- Augen weiß -->
+  <ellipse cx="98" cy="140" rx="18" ry="20" fill="white"/>
+  <ellipse cx="158" cy="140" rx="18" ry="20" fill="white"/>
+  <!-- Pupillen -->
+  <circle cx="98" cy="142" r="10" fill="#1A1A2E"/>
+  <circle cx="158" cy="142" r="10" fill="#1A1A2E"/>
+  <!-- Glanzpunkte -->
+  <circle cx="102" cy="137" r="4" fill="white"/>
+  <circle cx="162" cy="137" r="4" fill="white"/>
+  <!-- Schnauze -->
+  <ellipse cx="128" cy="172" rx="26" ry="16" fill="#FF6B1A"/>
+  <ellipse cx="128" cy="168" rx="18" ry="12" fill="#FFD6B0"/>
+  <!-- Nase -->
+  <ellipse cx="118" cy="162" rx="5" ry="4" fill="#FF6B1A"/>
+  <ellipse cx="138" cy="162" rx="5" ry="4" fill="#FF6B1A"/>
+  <!-- Mund -->
+  <path d="M112 178 Q128 190 144 178" stroke="#FF6B1A" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- Wangen -->
+  <ellipse cx="80" cy="158" rx="10" ry="7" fill="#FFB07A" opacity="0.5"/>
+  <ellipse cx="176" cy="158" rx="10" ry="7" fill="#FFB07A" opacity="0.5"/>
+</svg>

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <title>FoxiBrowser</title>
+</head>
+<body>
+
+  <!-- TITELLEISTE -->
+  <div id="titlebar">
+    <div id="titlebar-drag">
+      <svg id="app-logo" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="20" cy="22" rx="14" ry="12" fill="#FF8C42"/>
+        <path d="M6 16 Q4 8 10 6 Q8 14 14 15Z" fill="#FF6B1A"/>
+        <path d="M34 16 Q36 8 30 6 Q32 14 26 15Z" fill="#FF6B1A"/>
+        <ellipse cx="14" cy="20" rx="3" ry="3.5" fill="white"/>
+        <ellipse cx="26" cy="20" rx="3" ry="3.5" fill="white"/>
+        <circle cx="14" cy="20" r="1.5" fill="#333"/>
+        <circle cx="26" cy="20" r="1.5" fill="#333"/>
+        <ellipse cx="20" cy="27" rx="5" ry="3" fill="#FF6B1A"/>
+        <ellipse cx="20" cy="26" rx="3" ry="2" fill="#FFD6B0"/>
+      </svg>
+      <span id="app-name">FoxiBrowser</span>
+    </div>
+    <div id="titlebar-right">
+      <div id="time-display" class="hidden">
+        <span id="time-icon">⏰</span>
+        <span id="time-remaining-label"></span>
+      </div>
+      <button id="btn-parent" title="Eltern-Bereich">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+          <rect x="5" y="11" width="14" height="10" rx="3" fill="white" opacity="0.9"/>
+          <path d="M8 11V7.5a4 4 0 0 1 8 0V11" stroke="white" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.9"/>
+          <circle cx="12" cy="16" r="1.5" fill="rgba(255,107,53,0.9)"/>
+          <line x1="12" y1="17.5" x2="12" y2="19.5" stroke="rgba(255,107,53,0.9)" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div id="window-controls">
+        <button id="btn-minimize">&#8722;</button>
+        <button id="btn-maximize">&#9633;</button>
+        <button id="btn-close">&#x2715;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVIGATIONSLEISTE -->
+  <nav id="navbar">
+    <button class="nav-btn" id="btn-back"    title="Zurück"    disabled>&#8592;</button>
+    <button class="nav-btn" id="btn-forward" title="Weiter"    disabled>&#8594;</button>
+    <button class="nav-btn" id="btn-home"    title="Startseite">&#8962;</button>
+    <button class="nav-btn" id="btn-reload"  title="Neu laden" disabled>&#8635;</button>
+    <div id="address-bar-wrapper">
+      <span id="lock-icon" title="Verbindung">&#128274;</span>
+      <input id="address-bar" type="text" spellcheck="false"
+             placeholder="Eltern-PIN eingeben um Adresse zu öffnen…" autocomplete="off" readonly/>
+      <button id="btn-go">Los! &#x1F43E;</button>
+    </div>
+  </nav>
+
+  <!-- LADEBALKEN -->
+  <div id="loading-bar"><div id="loading-progress"></div></div>
+
+  <!-- STARTSEITE -->
+  <div id="home-page">
+    <div id="home-header">
+      <svg id="foxi-mascot" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="60" cy="70" rx="42" ry="36" fill="#FF8C42"/>
+        <path d="M18 50 Q12 25 28 18 Q24 42 40 46Z" fill="#FF6B1A"/>
+        <path d="M102 50 Q108 25 92 18 Q96 42 80 46Z" fill="#FF6B1A"/>
+        <ellipse cx="44" cy="60" rx="9" ry="10" fill="white"/>
+        <ellipse cx="76" cy="60" rx="9" ry="10" fill="white"/>
+        <circle cx="44" cy="61" r="5" fill="#222"/>
+        <circle cx="76" cy="61" r="5" fill="#222"/>
+        <circle cx="46" cy="59" r="2" fill="white"/>
+        <circle cx="78" cy="59" r="2" fill="white"/>
+        <ellipse cx="60" cy="80" rx="14" ry="8" fill="#FF6B1A"/>
+        <ellipse cx="60" cy="78" rx="9" ry="6" fill="#FFD6B0"/>
+        <circle cx="53" cy="74" r="2.5" fill="#FF6B1A"/>
+        <circle cx="67" cy="74" r="2.5" fill="#FF6B1A"/>
+        <path d="M50 88 Q60 95 70 88" stroke="#FF6B1A" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div id="home-welcome">
+        <h1>Hallo! Wohin möchtest du heute?</h1>
+        <p>Tippe auf eine Seite oder bitte Mama/Papa um eine neue Adresse.</p>
+      </div>
+    </div>
+    <div id="favorites-grid"></div>
+  </div>
+
+  <!-- BLOCKIERT-SEITE -->
+  <div id="blocked-page" class="hidden">
+    <svg id="blocked-fox" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="60" cy="70" rx="42" ry="36" fill="#FF8C42"/>
+      <path d="M18 50 Q12 25 28 18 Q24 42 40 46Z" fill="#FF6B1A"/>
+      <path d="M102 50 Q108 25 92 18 Q96 42 80 46Z" fill="#FF6B1A"/>
+      <ellipse cx="44" cy="60" rx="9" ry="10" fill="white"/>
+      <ellipse cx="76" cy="60" rx="9" ry="10" fill="white"/>
+      <line x1="40" y1="56" x2="48" y2="64" stroke="#222" stroke-width="3" stroke-linecap="round"/>
+      <line x1="48" y1="56" x2="40" y2="64" stroke="#222" stroke-width="3" stroke-linecap="round"/>
+      <line x1="72" y1="56" x2="80" y2="64" stroke="#222" stroke-width="3" stroke-linecap="round"/>
+      <line x1="80" y1="56" x2="72" y2="64" stroke="#222" stroke-width="3" stroke-linecap="round"/>
+      <ellipse cx="60" cy="82" rx="14" ry="8" fill="#FF6B1A"/>
+      <ellipse cx="60" cy="80" rx="9" ry="6" fill="#FFD6B0"/>
+      <circle cx="60" cy="20" r="14" fill="#EF5350"/>
+      <line x1="55" y1="15" x2="65" y2="25" stroke="white" stroke-width="3" stroke-linecap="round"/>
+      <line x1="65" y1="15" x2="55" y2="25" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    <h2>Hoppla! Diese Seite ist nicht für Kinder.</h2>
+    <p id="blocked-reason"></p>
+    <button id="btn-go-home-blocked" class="big-btn">&#8962; Zurück zur Startseite</button>
+  </div>
+
+  <!-- ZEIT-ABGELAUFEN-SEITE -->
+  <div id="time-limit-page" class="hidden">
+    <div id="time-limit-content">
+      <div style="font-size:80px">⏰</div>
+      <h2>Die Surfzeit für heute ist vorbei!</h2>
+      <p>Bitte frag Mama oder Papa wenn du weitersurfen möchtest.</p>
+      <button id="btn-time-parent" class="big-btn">🔒 Eltern-PIN eingeben</button>
+    </div>
+  </div>
+
+  <!-- WEBVIEW -->
+  <webview id="browser-view"
+           src="about:blank"
+           partition="persist:child"
+           nodeintegration="false"
+           webpreferences="contextIsolation=yes, javascript=yes"
+           allowpopups="false"
+           class="hidden">
+  </webview>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- PIN-DIALOG OVERLAY                                                      -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="pin-overlay" class="hidden">
+    <div id="pin-dialog">
+      <div id="pin-fox-icon">🦊</div>
+      <h2 id="pin-title">Mama oder Papa fragen!</h2>
+      <p id="pin-subtitle">Bitte die PIN eingeben</p>
+
+      <div id="pin-dots-row">
+        <span class="pin-dot" id="dot-0"></span>
+        <span class="pin-dot" id="dot-1"></span>
+        <span class="pin-dot" id="dot-2"></span>
+        <span class="pin-dot" id="dot-3"></span>
+      </div>
+      <p id="pin-error" class="hidden">Falsche PIN – bitte nochmal versuchen</p>
+
+      <div id="pin-numpad">
+        <button class="pin-key" data-digit="1">1</button>
+        <button class="pin-key" data-digit="2">2</button>
+        <button class="pin-key" data-digit="3">3</button>
+        <button class="pin-key" data-digit="4">4</button>
+        <button class="pin-key" data-digit="5">5</button>
+        <button class="pin-key" data-digit="6">6</button>
+        <button class="pin-key" data-digit="7">7</button>
+        <button class="pin-key" data-digit="8">8</button>
+        <button class="pin-key" data-digit="9">9</button>
+        <button class="pin-key pin-del" id="pin-delete">⌫</button>
+        <button class="pin-key" data-digit="0">0</button>
+        <button class="pin-key pin-cancel-key" id="pin-cancel">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- ELTERN-PANEL                                                            -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="parent-panel" class="hidden">
+    <div id="parent-panel-inner">
+
+      <!-- Header -->
+      <div id="parent-header">
+        <div id="parent-header-left">
+          <span id="parent-lock-icon">🔒</span>
+          <span id="parent-title">Eltern-Bereich</span>
+        </div>
+        <button id="parent-close">✕ Schließen</button>
+      </div>
+
+      <!-- Tabs -->
+      <div id="parent-tabs">
+        <button class="tab-btn active" data-tab="history">📋 Verlauf</button>
+        <button class="tab-btn" data-tab="time">⏰ Nutzungszeit</button>
+        <button class="tab-btn" data-tab="favorites">⭐ Startseite</button>
+        <button class="tab-btn" data-tab="pin">🔑 PIN ändern</button>
+        <button class="tab-btn" data-tab="profile">👶 Kind-Profil</button>
+      </div>
+
+      <!-- Tab: Verlauf -->
+      <div class="tab-content active" id="tab-history">
+        <div class="tab-toolbar">
+          <h3>Besuchte Seiten</h3>
+          <button class="danger-btn" id="btn-clear-history">🗑 Verlauf löschen</button>
+        </div>
+        <div id="history-list"></div>
+      </div>
+
+      <!-- Tab: Nutzungszeit -->
+      <div class="tab-content hidden" id="tab-time">
+        <h3>Tägliche Nutzungszeit</h3>
+        <div id="usage-today-box">
+          <div class="usage-stat">
+            <span class="usage-label">Heute genutzt</span>
+            <span class="usage-value" id="usage-today-val">0 Min.</span>
+          </div>
+          <div class="usage-stat">
+            <span class="usage-label">Tages-Limit</span>
+            <span class="usage-value" id="usage-limit-val">Kein Limit</span>
+          </div>
+        </div>
+
+        <div id="week-chart">
+          <h4>Diese Woche (Minuten pro Tag)</h4>
+          <div id="chart-bars"></div>
+          <div id="chart-labels"></div>
+        </div>
+
+        <div id="limit-setter">
+          <label for="limit-range"><strong>Tages-Limit festlegen:</strong>
+            <span id="limit-display">Kein Limit</span>
+          </label>
+          <input type="range" id="limit-range" min="0" max="240" step="15" value="0">
+          <div id="limit-presets">
+            <button class="preset-btn" data-mins="0">Kein Limit</button>
+            <button class="preset-btn" data-mins="30">30 Min.</button>
+            <button class="preset-btn" data-mins="60">1 Std.</button>
+            <button class="preset-btn" data-mins="90">1,5 Std.</button>
+            <button class="preset-btn" data-mins="120">2 Std.</button>
+          </div>
+          <button class="action-btn" id="btn-save-limit">✓ Limit speichern</button>
+          <button class="danger-btn" id="btn-reset-today">↺ Heutigen Zähler zurücksetzen</button>
+        </div>
+      </div>
+
+      <!-- Tab: Startseite anpassen -->
+      <div class="tab-content hidden" id="tab-favorites">
+        <h3>Startseite anpassen</h3>
+        <p class="hint-text">Ziehe die Karten um sie neu anzuordnen. Klicke auf ✕ zum Löschen.</p>
+        <div id="fav-editor-list"></div>
+        <div id="add-fav-form">
+          <h4>Neue Seite hinzufügen</h4>
+          <div class="fav-form-row">
+            <input type="text" id="new-fav-name"  placeholder="Name (z.B. KiKA)" maxlength="25"/>
+            <input type="text" id="new-fav-url"   placeholder="Adresse (z.B. www.kika.de)"/>
+            <input type="text" id="new-fav-emoji" placeholder="Emoji" maxlength="2" class="emoji-input"/>
+            <button type="button" class="action-btn" id="btn-add-fav">+ Hinzufügen</button>
+          </div>
+          <p id="add-fav-error" class="hidden error-text"></p>
+        </div>
+        <button type="button" class="action-btn save-fav-btn" id="btn-save-favorites">✓ Startseite speichern</button>
+      </div>
+
+      <!-- Tab: Kind-Profil -->
+      <div class="tab-content hidden" id="tab-profile">
+        <h3>Kind-Profil & Altersgruppe</h3>
+        <p class="hint-text">Wähle die Altersgruppe deines Kindes. Das Design und die Startseite passen sich automatisch an.</p>
+        <div id="age-profile-cards">
+          <div class="age-card" data-age="klein">
+            <div class="age-card-icon">🐣</div>
+            <div class="age-card-label">Klein</div>
+            <div class="age-card-range">3 – 6 Jahre</div>
+            <div class="age-card-desc">Große Buttons, bunte Farben, einfache Kinderseiten</div>
+          </div>
+          <div class="age-card" data-age="mittel">
+            <div class="age-card-icon">🦊</div>
+            <div class="age-card-label">Mittel</div>
+            <div class="age-card-range">7 – 10 Jahre</div>
+            <div class="age-card-desc">Klassisches Foxi-Theme mit Lern- und Spaßseiten</div>
+          </div>
+          <div class="age-card" data-age="gross">
+            <div class="age-card-icon">🚀</div>
+            <div class="age-card-label">Groß</div>
+            <div class="age-card-range">11 – 14 Jahre</div>
+            <div class="age-card-desc">Ruhigeres Design, mehr Bildung und Wissen</div>
+          </div>
+        </div>
+        <div id="age-profile-note" class="hint-text hidden">
+          ⚠️ Die Startseite wird auf die Standard-Seiten dieser Altersgruppe zurückgesetzt.
+        </div>
+        <button type="button" class="action-btn" id="btn-save-profile">✓ Profil übernehmen</button>
+      </div>
+
+      <!-- Tab: PIN ändern -->
+      <div class="tab-content hidden" id="tab-pin">
+        <h3>PIN ändern</h3>
+        <div id="pin-change-form">
+          <div class="form-group">
+            <label>Aktuelle PIN</label>
+            <input type="password" id="pin-current" maxlength="4" inputmode="numeric" placeholder="••••"/>
+          </div>
+          <div class="form-group">
+            <label>Neue PIN (4 Ziffern)</label>
+            <input type="password" id="pin-new" maxlength="4" inputmode="numeric" placeholder="••••"/>
+          </div>
+          <div class="form-group">
+            <label>Neue PIN bestätigen</label>
+            <input type="password" id="pin-confirm" maxlength="4" inputmode="numeric" placeholder="••••"/>
+          </div>
+          <p id="pin-change-msg" class="hidden"></p>
+          <button class="action-btn" id="btn-save-pin">✓ PIN speichern</button>
+        </div>
+        <div id="pin-info-box">
+          <p>💡 <strong>Tipp:</strong> Die Standard-PIN ist <strong>1234</strong>. Bitte ändere sie bei der ersten Nutzung.</p>
+        </div>
+      </div>
+
+      <!-- Panel-Footer mit Version -->
+      <div id="parent-footer">
+        <span id="parent-version">FoxiBrowser</span>
+        <a href="http://foxibrowser.de/" id="parent-website" title="FoxiBrowser Website">🌐 foxibrowser.de</a>
+        <button type="button" id="btn-check-update">🔄 Nach Updates suchen</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RECHTSKLICK-MENÜ BACKDROP (fängt Klicks außerhalb ab) -->
+  <div id="ctx-backdrop" class="hidden"></div>
+
+  <!-- RECHTSKLICK-MENÜ -->
+  <div id="context-menu" class="hidden">
+    <button class="ctx-item" id="ctx-copy">  📋 Kopieren   <kbd>Strg+C</kbd></button>
+    <button class="ctx-item" id="ctx-paste"> 📌 Einfügen   <kbd>Strg+V</kbd></button>
+    <div class="ctx-sep"></div>
+    <button class="ctx-item" id="ctx-print"> 🖨️ Drucken    <kbd>Strg+P</kbd></button>
+    <div class="ctx-sep"></div>
+    <button class="ctx-item" id="ctx-back">  ← Zurück      <kbd>Alt+←</kbd></button>
+    <button class="ctx-item" id="ctx-forward">→ Vorwärts   <kbd>Alt+→</kbd></button>
+    <button class="ctx-item" id="ctx-reload"> ↻ Neu laden  <kbd>F5</kbd></button>
+  </div>
+
+  <!-- UPDATE-BANNER -->
+  <div id="update-banner" class="hidden">
+    <span id="update-text">🦊 Update verfügbar!</span>
+    <button id="btn-install-update">Jetzt installieren</button>
+    <button id="btn-update-later">Später</button>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
