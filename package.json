@@ -1,6 +1,6 @@
 {
   "name": "foxi-browser",
-  "version": "1.1.14",
+  "version": "1.1.15",
   "description": "Ein sicherer, bunter Browser für Kinder",
   "main": "main.js",
   "scripts": {
@@ -25,6 +25,10 @@
     "ssh2-sftp-client": "^12.1.1",
     "to-ico": "^1.1.5"
   },
-  "author": "FoxiBrowser",
+  "author": {
+    "name": "Christoph Zibulenski",
+    "email": "info@z3dprint.de",
+    "url": "http://foxibrowser.de"
+  },
   "license": "MIT"
 }
