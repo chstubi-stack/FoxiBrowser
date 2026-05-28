@@ -692,28 +692,29 @@ function escHtml(str) {
 // RECHTSKLICK-MENÜ
 // ══════════════════════════════════════════════════════════════════════════
 
-const ctxMenu   = document.getElementById('context-menu');
-let ctxHasText  = false;
-let ctxEditable = false;
+const ctxMenu     = document.getElementById('context-menu');
+const ctxBackdrop = document.getElementById('ctx-backdrop');
 
 function showCtxMenu(x, y, hasText, editable) {
-  ctxHasText  = hasText;
-  ctxEditable = editable;
   document.getElementById('ctx-copy').disabled    = !hasText;
   document.getElementById('ctx-paste').disabled   = !editable;
   document.getElementById('ctx-back').disabled    = !webview.canGoBack();
   document.getElementById('ctx-forward').disabled = !webview.canGoForward();
 
   ctxMenu.classList.remove('hidden');
+  ctxBackdrop.classList.remove('hidden');
 
   // Menü bleibt innerhalb des Fensters
   const mw = ctxMenu.offsetWidth  || 180;
-  const mh = ctxMenu.offsetHeight || 200;
+  const mh = ctxMenu.offsetHeight || 220;
   ctxMenu.style.left = (x + mw > window.innerWidth  ? x - mw : x) + 'px';
   ctxMenu.style.top  = (y + mh > window.innerHeight ? y - mh : y) + 'px';
 }
 
-function hideCtxMenu() { ctxMenu.classList.add('hidden'); }
+function hideCtxMenu() {
+  ctxMenu.classList.add('hidden');
+  ctxBackdrop.classList.add('hidden');
+}
 
 // Rechtsklick: Position kommt vom Hauptprozess (screen.getCursorScreenPoint)
 window.foxiAPI.onContextMenu(data => {
@@ -721,20 +722,22 @@ window.foxiAPI.onContextMenu(data => {
   showCtxMenu(data.x, data.y, !!data.selectionText, !!data.isEditable);
 });
 
-// Menü-Aktionen
-document.getElementById('ctx-copy').addEventListener('click',    () => { webview.copy();    hideCtxMenu(); });
-document.getElementById('ctx-paste').addEventListener('click',   () => { webview.paste();   hideCtxMenu(); });
-document.getElementById('ctx-print').addEventListener('click',   () => { webview.print();   hideCtxMenu(); });
-document.getElementById('ctx-back').addEventListener('click',    () => { try { webview.goBack();    } catch(_){} hideCtxMenu(); });
-document.getElementById('ctx-forward').addEventListener('click', () => { try { webview.goForward(); } catch(_){} hideCtxMenu(); });
-document.getElementById('ctx-reload').addEventListener('click',  () => { try { webview.reload();    } catch(_){} hideCtxMenu(); });
+// Menü-Aktionen – Webview muss Fokus haben für copy/paste
+document.getElementById('ctx-copy').addEventListener('click', () => {
+  hideCtxMenu(); webview.focus(); setTimeout(() => webview.copy(), 50);
+});
+document.getElementById('ctx-paste').addEventListener('click', () => {
+  hideCtxMenu(); webview.focus(); setTimeout(() => webview.paste(), 50);
+});
+document.getElementById('ctx-print').addEventListener('click',   () => { hideCtxMenu(); webview.print(); });
+document.getElementById('ctx-back').addEventListener('click',    () => { hideCtxMenu(); try { webview.goBack();    } catch(_){} });
+document.getElementById('ctx-forward').addEventListener('click', () => { hideCtxMenu(); try { webview.goForward(); } catch(_){} });
+document.getElementById('ctx-reload').addEventListener('click',  () => { hideCtxMenu(); try { webview.reload();    } catch(_){} });
 
-// Menü schließen
-document.addEventListener('mousedown', e => { if (!ctxMenu.contains(e.target)) hideCtxMenu(); });
-document.addEventListener('keydown',   e => { if (e.key === 'Escape') hideCtxMenu(); });
+// Backdrop-Klick schließt Menü (fängt auch Klicks im Webview ab)
+ctxBackdrop.addEventListener('mousedown', hideCtxMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCtxMenu(); });
 webview.addEventListener('will-navigate', hideCtxMenu);
-// Linksklick im Webview (button=0) schließt das Menü
-webview.addEventListener('mousedown', e => { if (e.button === 0) hideCtxMenu(); });
 
 // ══════════════════════════════════════════════════════════════════════════
 // AUTO-UPDATE & VERSION

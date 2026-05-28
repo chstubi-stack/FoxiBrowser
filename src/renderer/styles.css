@@ -625,3 +625,10 @@ html, body {
   transition: background .15s;
 }
 #btn-check-update:hover { background: rgba(255,255,255,.08); }
+
+/* ── CONTEXT MENU BACKDROP ───────────────────────────────────────────────── */
+#ctx-backdrop {
+  position: fixed; inset: 0;
+  z-index: 99998;
+  background: transparent;
+}
