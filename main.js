@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain, session, screen } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 
@@ -348,4 +348,17 @@ app.on('web-contents-created', (_, contents) => {
     } catch (_) { event.preventDefault(); }
   });
   contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+  // Cursor-Position beim Rechtsklick an Renderer senden
+  contents.on('context-menu', (event, params) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const cursor  = screen.getCursorScreenPoint();
+    const bounds  = mainWindow.getBounds();
+    mainWindow.webContents.send('context-menu-at', {
+      x: cursor.x - bounds.x,
+      y: cursor.y - bounds.y,
+      selectionText: params.selectionText,
+      isEditable:    params.isEditable,
+    });
+  });
 });

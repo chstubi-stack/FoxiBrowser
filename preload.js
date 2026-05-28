@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   checkForUpdate: ()        => ipcRenderer.invoke('check-for-update'),
   installUpdate:  ()        => ipcRenderer.send('install-update'),
   // Events vom Hauptprozess
+  onContextMenu:      (cb)  => ipcRenderer.on('context-menu-at', (_, d) => cb(d)),
   onBlocked:          (cb)  => ipcRenderer.on('navigation-blocked', (_, d) => cb(d)),
   onTimeUpdate:       (cb)  => ipcRenderer.on('time-update', (_, d) => cb(d)),
   onTimeLimitReached: (cb)  => ipcRenderer.on('time-limit-reached', () => cb()),

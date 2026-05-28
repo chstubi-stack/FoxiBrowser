@@ -715,22 +715,10 @@ function showCtxMenu(x, y, hasText, editable) {
 
 function hideCtxMenu() { ctxMenu.classList.add('hidden'); }
 
-// Letzte Mausposition beim Rechtsklick merken (mousedown feuert im Renderer-Kontext)
-let lastRightClickX = 0;
-let lastRightClickY = 0;
-webview.addEventListener('mousedown', e => {
-  if (e.button === 2) { lastRightClickX = e.clientX; lastRightClickY = e.clientY; }
-});
-
-// Rechtsklick auf Webview
-webview.addEventListener('context-menu', e => {
-  e.preventDefault();
+// Rechtsklick: Position kommt vom Hauptprozess (screen.getCursorScreenPoint)
+window.foxiAPI.onContextMenu(data => {
   if (isHome) return;
-  const params = e.params || {};
-  showCtxMenu(lastRightClickX, lastRightClickY,
-    !!params.selectionText,
-    !!params.isEditable
-  );
+  showCtxMenu(data.x, data.y, !!data.selectionText, !!data.isEditable);
 });
 
 // Menü-Aktionen
