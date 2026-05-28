@@ -1,10 +1,10 @@
 appId: com.foxibrowser.app
 productName: FoxiBrowser
-copyright: "Copyright 2025 Christoph Zibulenski"
+copyright: "Copyright 2025 Z3DPrint.de"
 
 extraMetadata:
   author:
-    name: Christoph Zibulenski
+    name: Z3DPrint.de
     email: info@z3dprint.de
 
 directories:
