@@ -632,3 +632,22 @@ html, body {
   z-index: 99998;
   background: transparent;
 }
+
+/* ── KBD TASTENKÜRZEL ────────────────────────────────────────────────────── */
+.ctx-item {
+  justify-content: space-between;
+}
+.ctx-item kbd {
+  font-family: var(--font);
+  font-size: 11px; font-weight: 700;
+  color: #999;
+  background: #F0F0F0;
+  border: 1px solid #D0D0D0;
+  border-bottom: 2px solid #B0B0B0;
+  border-radius: 5px;
+  padding: 1px 6px;
+  margin-left: auto;
+  pointer-events: none;
+}
+.ctx-item:hover kbd { color: var(--foxi-orange); background: #FFF3EE; border-color: #FFCBB5; border-bottom-color: #FF9E7A; }
+.ctx-item:disabled kbd { opacity: 0.4; }
