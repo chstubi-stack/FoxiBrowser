@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, session, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, session, screen, shell } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 
@@ -262,6 +262,8 @@ ipcMain.handle('check-for-update', () => {
 ipcMain.on('install-update', () => {
   try { require('electron-updater').autoUpdater.quitAndInstall(); } catch (_) {}
 });
+
+ipcMain.on('open-external', (_, url) => { if (url.startsWith('http')) shell.openExternal(url); });
 
 ipcMain.on('window-minimize', () => mainWindow?.minimize());
 ipcMain.on('window-maximize', () => { if (mainWindow?.isMaximized()) mainWindow.unmaximize(); else mainWindow?.maximize(); });

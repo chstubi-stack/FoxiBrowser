@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   // Update
   checkForUpdate: ()        => ipcRenderer.invoke('check-for-update'),
   installUpdate:  ()        => ipcRenderer.send('install-update'),
+  openExternal:   (url)     => ipcRenderer.send('open-external', url),
   // Events vom Hauptprozess
   onContextMenu:      (cb)  => ipcRenderer.on('context-menu-at', (_, d) => cb(d)),
   onBlocked:          (cb)  => ipcRenderer.on('navigation-blocked', (_, d) => cb(d)),

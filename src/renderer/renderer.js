@@ -771,6 +771,11 @@ async function showVersionInPanel() {
   if (el) el.textContent = `FoxiBrowser v${v}`;
 }
 
+document.getElementById('parent-website').addEventListener('click', (e) => {
+  e.preventDefault();
+  window.foxiAPI.openExternal('http://foxibrowser.de/');
+});
+
 document.getElementById('btn-check-update').addEventListener('click', () => {
   window.foxiAPI.checkForUpdate();
   document.getElementById('update-text').textContent = '🔄 Suche nach Updates…';
