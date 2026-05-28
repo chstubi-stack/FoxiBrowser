@@ -719,9 +719,14 @@ function hideCtxMenu() { ctxMenu.classList.add('hidden'); }
 webview.addEventListener('context-menu', e => {
   e.preventDefault();
   if (isHome) return;
-  showCtxMenu(e.x, e.y,
+  // Webview-Position zum Fenster addieren
+  const rect = webview.getBoundingClientRect();
+  showCtxMenu(
+    rect.left + e.x,
+    rect.top  + e.y,
     !!(e.params && e.params.selectionText),
-    !!(e.params && e.params.isEditable));
+    !!(e.params && e.params.isEditable)
+  );
 });
 
 // Menü-Aktionen
