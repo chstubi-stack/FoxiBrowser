@@ -265,6 +265,48 @@ ipcMain.on('install-update', () => {
 
 ipcMain.on('open-external', (_, url) => { if (url.startsWith('http')) shell.openExternal(url); });
 
+ipcMain.on('allow-popup', (_, url) => {
+  try {
+    const parsed = new URL(url);
+    if (!['https:', 'http:'].includes(parsed.protocol)) return;
+  } catch (_) { return; }
+
+  const popup = new BrowserWindow({
+    width: 900, height: 700,
+    parent: mainWindow,
+    modal: false,
+    autoHideMenuBar: true,
+    title: 'FoxiBrowser – Popup',
+    icon: require('path').join(__dirname, 'src', 'assets', 'icon.png'),
+    webPreferences: {
+      partition: 'persist:child',
+      contextIsolation: true,
+      nodeIntegration: false,
+      webviewTag: false,
+    },
+  });
+
+  popup.loadURL(url);
+
+  // Fenster schließen sobald OAuth-Redirect zurück kommt
+  popup.webContents.on('will-navigate', (event, navUrl) => {
+    try {
+      const u = new URL(navUrl);
+      if (u.searchParams.has('gaia_popup_redirect') || navUrl.includes('popup_redirect')) {
+        // Redirect-URL an Hauptfenster weitergeben und Popup schließen
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('popup-redirect', navUrl);
+        }
+        popup.close();
+      }
+    } catch (_) {}
+  });
+
+  popup.on('closed', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
+  });
+});
+
 ipcMain.on('window-minimize', () => mainWindow?.minimize());
 ipcMain.on('window-maximize', () => { if (mainWindow?.isMaximized()) mainWindow.unmaximize(); else mainWindow?.maximize(); });
 ipcMain.on('window-close',    () => mainWindow?.close());
@@ -355,6 +397,7 @@ app.on('web-contents-created', (_, contents) => {
     }
     return { action: 'deny' };
   });
+
 
   // Cursor-Position beim Rechtsklick an Renderer senden
   contents.on('context-menu', (event, params) => {

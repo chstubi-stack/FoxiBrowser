@@ -754,9 +754,13 @@ window.foxiAPI.onUpdateAvailable(info => {
 window.foxiAPI.onPopupRequested(url => {
   openPinDialog(
     'Popup-Fenster öffnen?',
-    `Eine Seite möchte ein neues Fenster öffnen.`,
-    () => { showBrowser(url); }
+    'Eine Seite möchte ein neues Fenster öffnen.',
+    () => { window.foxiAPI.allowPopup(url); }
   );
+});
+
+window.foxiAPI.onPopupRedirect(url => {
+  showBrowser(url);
 });
 
 window.foxiAPI.onUpdateDownloaded(info => {
