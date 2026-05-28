@@ -1,6 +1,6 @@
 {
   "name": "foxi-browser",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Ein sicherer, bunter Browser für Kinder",
   "main": "main.js",
   "scripts": {

@@ -719,13 +719,14 @@ function hideCtxMenu() { ctxMenu.classList.add('hidden'); }
 webview.addEventListener('context-menu', e => {
   e.preventDefault();
   if (isHome) return;
-  // Webview-Position zum Fenster addieren
-  const rect = webview.getBoundingClientRect();
-  showCtxMenu(
-    rect.left + e.x,
-    rect.top  + e.y,
-    !!(e.params && e.params.selectionText),
-    !!(e.params && e.params.isEditable)
+  const rect   = webview.getBoundingClientRect();
+  const params = e.params || {};
+  // params.x/y sind Viewport-Koordinaten innerhalb des Webviews
+  const x = rect.left + (params.x || 0);
+  const y = rect.top  + (params.y || 0);
+  showCtxMenu(x, y,
+    !!params.selectionText,
+    !!params.isEditable
   );
 });
 
