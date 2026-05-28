@@ -729,10 +729,12 @@ document.getElementById('ctx-back').addEventListener('click',    () => { try { w
 document.getElementById('ctx-forward').addEventListener('click', () => { try { webview.goForward(); } catch(_){} hideCtxMenu(); });
 document.getElementById('ctx-reload').addEventListener('click',  () => { try { webview.reload();    } catch(_){} hideCtxMenu(); });
 
-// Menü schließen bei Klick außerhalb
-document.addEventListener('click',      e => { if (!ctxMenu.contains(e.target)) hideCtxMenu(); });
-document.addEventListener('keydown',    e => { if (e.key === 'Escape') hideCtxMenu(); });
+// Menü schließen
+document.addEventListener('mousedown', e => { if (!ctxMenu.contains(e.target)) hideCtxMenu(); });
+document.addEventListener('keydown',   e => { if (e.key === 'Escape') hideCtxMenu(); });
 webview.addEventListener('will-navigate', hideCtxMenu);
+// Linksklick im Webview (button=0) schließt das Menü
+webview.addEventListener('mousedown', e => { if (e.button === 0) hideCtxMenu(); });
 
 // ══════════════════════════════════════════════════════════════════════════
 // AUTO-UPDATE & VERSION
