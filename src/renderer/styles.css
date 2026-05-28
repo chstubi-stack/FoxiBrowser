@@ -152,7 +152,10 @@ html, body {
 #btn-minimize { background: #FFBD2E; }
 #btn-maximize { background: #28C840; }
 #btn-close    { background: #FF5F57; }
-#window-controls button:hover { filter: brightness(.85); transform: scale(1.12); color: rgba(0,0,0,0.45); }
+#window-controls button:hover { filter: brightness(.85); transform: scale(1.12); }
+#btn-minimize { color: rgba(0,0,0,0.35); }
+#btn-maximize { color: rgba(0,0,0,0.35); }
+#btn-close    { color: rgba(0,0,0,0.35); }
 
 /* â”€â”€ NAVIGATIONSLEISTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 #navbar {
@@ -652,4 +655,5 @@ html, body {
 }
 .ctx-item:hover kbd { color: var(--foxi-orange); background: #FFF3EE; border-color: #FFCBB5; border-bottom-color: #FF9E7A; }
 .ctx-item:disabled kbd { opacity: 0.4; }
+
 
