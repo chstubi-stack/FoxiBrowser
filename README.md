@@ -21,6 +21,9 @@ Ein kindgerechter Desktop-Browser auf Basis von Electron. Gebaut für Windows 11
 | 1.1.9 | Fix: Symbole auf Fenster-Buttons sichtbar |
 | 1.1.10 | Fix: color:transparent entfernt |
 | 1.1.11 | Feature: SVG Schloss-Icon für Eltern-Button |
+| 1.1.12 | Feature: Website-Link im Eltern-Bereich Footer (foxibrowser.de) |
+| 1.1.13 | Feature: Popup-Fenster mit Eltern-PIN freigeben |
+| 1.1.14 | Fix: Popup-Fenster als echtes Kind-Fenster mit persist:child Session |
 
 ---
 
