@@ -349,7 +349,12 @@ app.on('web-contents-created', (_, contents) => {
       if (!ALLOWED_PROTOCOLS.has(protocol) && protocol !== 'about:' && protocol !== 'file:') event.preventDefault();
     } catch (_) { event.preventDefault(); }
   });
-  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  contents.setWindowOpenHandler(({ url }) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('popup-requested', url);
+    }
+    return { action: 'deny' };
+  });
 
   // Cursor-Position beim Rechtsklick an Renderer senden
   contents.on('context-menu', (event, params) => {

@@ -751,6 +751,14 @@ window.foxiAPI.onUpdateAvailable(info => {
   updateBanner.classList.remove('hidden');
 });
 
+window.foxiAPI.onPopupRequested(url => {
+  openPinDialog(
+    'Popup-Fenster öffnen?',
+    `Eine Seite möchte ein neues Fenster öffnen.`,
+    () => { showBrowser(url); }
+  );
+});
+
 window.foxiAPI.onUpdateDownloaded(info => {
   document.getElementById('update-text').textContent =
     `✅ Update ${info.version} bereit zum Installieren`;

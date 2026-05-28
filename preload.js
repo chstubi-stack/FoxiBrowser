@@ -36,4 +36,5 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   onTimeLimitReached: (cb)  => ipcRenderer.on('time-limit-reached', () => cb()),
   onUpdateAvailable:  (cb)  => ipcRenderer.on('update-available', (_, info) => cb(info)),
   onUpdateDownloaded: (cb)  => ipcRenderer.on('update-downloaded', (_, info) => cb(info)),
+  onPopupRequested:   (cb)  => ipcRenderer.on('popup-requested', (_, url) => cb(url)),
 });
