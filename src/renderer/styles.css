@@ -141,7 +141,7 @@ html, body {
 
 #window-controls { display: flex; gap: 6px; align-items: center; }
 #window-controls button {
-  border: none; color: transparent;
+  border: none; color: rgba(0,0,0,0.4);
   font-size: 13px; cursor: pointer;
   width: 28px; height: 28px;
   border-radius: 50%;
@@ -655,5 +655,6 @@ html, body {
 }
 .ctx-item:hover kbd { color: var(--foxi-orange); background: #FFF3EE; border-color: #FFCBB5; border-bottom-color: #FF9E7A; }
 .ctx-item:disabled kbd { opacity: 0.4; }
+
 
 
