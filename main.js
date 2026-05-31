@@ -84,22 +84,45 @@ async function addUsageSeconds(secs) {
   return data[key];
 }
 
+let warningSent5min = false;
+let warningSent1min = false;
+
 async function checkTimeLimit() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const s = await getStore();
   const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
-  const limitMins = settings.timeLimitMinutes || 0;
-  if (limitMins <= 0) return; // kein Limit
 
-  const usedSecs = await getUsedSeconds();
-  const limitSecs = limitMins * 60;
+  // Wochentag-Limit hat Vorrang vor globalem Limit
+  const todayDow   = new Date().getDay(); // 0=So, 1=Mo...
+  const weekLimits = settings.weekdayLimits || {};
+  const limitMins  = (weekLimits[todayDow] !== undefined)
+    ? weekLimits[todayDow]
+    : (settings.timeLimitMinutes || 0);
+
+  if (limitMins <= 0) return;
+
+  const usedSecs    = await getUsedSeconds();
+  const limitSecs   = limitMins * 60;
   const remainingSecs = limitSecs - usedSecs;
 
   mainWindow.webContents.send('time-update', {
     usedSeconds: usedSecs,
     limitSeconds: limitSecs,
-    remainingSeconds: remainingSecs
+    remainingSeconds: remainingSecs,
   });
+
+  // Vorwarnung 5 Minuten
+  if (remainingSecs <= 300 && remainingSecs > 60 && !warningSent5min) {
+    warningSent5min = true;
+    mainWindow.webContents.send('time-warning', { remainingSeconds: remainingSecs });
+  }
+  // Vorwarnung 1 Minute
+  if (remainingSecs <= 60 && remainingSecs > 0 && !warningSent1min) {
+    warningSent1min = true;
+    mainWindow.webContents.send('time-warning', { remainingSeconds: remainingSecs });
+  }
+  // Reset Warnungen wenn Zähler zurückgesetzt wurde
+  if (remainingSecs > 300) { warningSent5min = false; warningSent1min = false; }
 
   if (remainingSecs <= 0) {
     mainWindow.webContents.send('time-limit-reached');

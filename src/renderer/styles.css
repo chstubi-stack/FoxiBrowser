@@ -544,6 +544,21 @@ html, body {
 }
 .danger-btn:hover { background: var(--foxi-red); color: white; }
 .hint-text  { font-size: 13px; color: #666; margin-bottom: 14px; }
+
+/* Wochentag-Limits */
+#weekday-limits { background: var(--parent-card); border-radius: 14px; padding: 18px; margin-top: 20px; border: 1px solid var(--parent-border); }
+#weekday-limits h4 { font-size: 15px; font-weight: 800; color: var(--parent-text); margin-bottom: 6px; }
+#weekday-rows { margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+.weekday-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--parent-border); }
+.weekday-row.weekend .wd-label { color: var(--foxi-orange); }
+.wd-label { font-size: 14px; font-weight: 700; color: var(--parent-text); min-width: 100px; }
+.wd-select { background: var(--parent-bg); color: var(--parent-text); border: 1px solid var(--parent-border); border-radius: 8px; padding: 5px 10px; font-size: 13px; font-family: var(--font); cursor: pointer; }
+.wd-select:focus { outline: none; border-color: var(--foxi-orange); }
+#weekday-save-msg { font-size: 13px; font-weight: 700; margin-top: 10px; color: #28C840; }
+
+/* Zeitlimit-Warnung */
+#time-warning-banner { position: fixed; bottom: 70px; right: 20px; background: #FF8C00; color: white; padding: 14px 20px; border-radius: 16px; font-size: 15px; font-weight: 800; box-shadow: 0 4px 20px rgba(0,0,0,.4); z-index: 9999; display: flex; align-items: center; gap: 10px; animation: slideInRight .3s ease; }
+@keyframes slideInRight { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .error-text { color: var(--foxi-red); font-size: 13px; margin-top: 8px; }
 #pin-change-msg { font-size: 14px; font-weight: 700; margin: 10px 0; padding: 10px 14px; border-radius: 10px; }
 #pin-change-msg.success { background: rgba(76,175,80,.15); color: #66BB6A; }

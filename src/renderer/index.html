@@ -245,6 +245,22 @@
           <button class="action-btn" id="btn-save-limit">✓ Limit speichern</button>
           <button class="danger-btn" id="btn-reset-today">↺ Heutigen Zähler zurücksetzen</button>
         </div>
+
+        <div id="weekday-limits">
+          <h4>Wochentag-Limits</h4>
+          <p class="hint-text">Unterschiedliche Limits für Schultage und Wochenende.</p>
+          <div id="weekday-rows">
+            <div class="weekday-row"><span class="wd-label">Montag</span>    <select class="wd-select" data-day="1" title="Limit Montag"></select></div>
+            <div class="weekday-row"><span class="wd-label">Dienstag</span>  <select class="wd-select" data-day="2" title="Limit Dienstag"></select></div>
+            <div class="weekday-row"><span class="wd-label">Mittwoch</span>  <select class="wd-select" data-day="3" title="Limit Mittwoch"></select></div>
+            <div class="weekday-row"><span class="wd-label">Donnerstag</span><select class="wd-select" data-day="4" title="Limit Donnerstag"></select></div>
+            <div class="weekday-row"><span class="wd-label">Freitag</span>   <select class="wd-select" data-day="5" title="Limit Freitag"></select></div>
+            <div class="weekday-row weekend"><span class="wd-label">Samstag</span>  <select class="wd-select" data-day="6" title="Limit Samstag"></select></div>
+            <div class="weekday-row weekend"><span class="wd-label">Sonntag</span>  <select class="wd-select" data-day="0" title="Limit Sonntag"></select></div>
+          </div>
+          <button class="action-btn" id="btn-save-weekday-limits">✓ Wochentag-Limits speichern</button>
+          <p id="weekday-save-msg" class="hidden"></p>
+        </div>
       </div>
 
       <!-- Tab: Startseite anpassen -->
@@ -361,6 +377,11 @@
   </div>
 
   <!-- UPDATE-BANNER -->
+  <div id="time-warning-banner" class="hidden">
+    <span>⏰</span>
+    <span id="time-warning-text">Noch 5 Minuten!</span>
+  </div>
+
   <div id="update-banner" class="hidden">
     <span id="update-text">🦊 Update verfügbar!</span>
     <button id="btn-install-update">Jetzt installieren</button>

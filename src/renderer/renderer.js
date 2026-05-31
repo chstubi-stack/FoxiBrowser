@@ -485,6 +485,28 @@ document.getElementById('btn-clear-history').addEventListener('click', async () 
 
 // ── Tab: Nutzungszeit ─────────────────────────────────────────────────────
 
+const WD_OPTIONS = [
+  { value: -1, label: 'Kein Limit' },
+  { value: 30,  label: '30 Min.' },
+  { value: 60,  label: '1 Std.' },
+  { value: 90,  label: '1,5 Std.' },
+  { value: 120, label: '2 Std.' },
+  { value: 180, label: '3 Std.' },
+];
+
+function buildWdSelects() {
+  document.querySelectorAll('.wd-select').forEach(sel => {
+    if (sel.options.length === 0) {
+      WD_OPTIONS.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.label;
+        sel.appendChild(opt);
+      });
+    }
+  });
+}
+
 async function loadParentTime() {
   const settings  = await window.foxiAPI.getSettings();
   const usedSecs  = await window.foxiAPI.getUsageToday();
@@ -519,6 +541,14 @@ async function loadParentTime() {
   updateLimitDisplay(limitMins);
   document.querySelectorAll('.preset-btn').forEach(b => {
     b.classList.toggle('active', parseInt(b.dataset.mins) === limitMins);
+  });
+
+  // Wochentag-Limits befüllen
+  buildWdSelects();
+  const weekLimits = settings.weekdayLimits || {};
+  document.querySelectorAll('.wd-select').forEach(sel => {
+    const day = parseInt(sel.dataset.day);
+    sel.value = (weekLimits[day] !== undefined) ? weekLimits[day] : -1;
   });
 }
 
@@ -558,6 +588,33 @@ document.getElementById('btn-reset-today').addEventListener('click', async () =>
   await window.foxiAPI.resetUsageToday();
   timeLimitReached = false;
   await loadParentTime();
+});
+
+document.getElementById('btn-save-weekday-limits').addEventListener('click', async () => {
+  const settings = await window.foxiAPI.getSettings();
+  const weekdayLimits = {};
+  document.querySelectorAll('.wd-select').forEach(sel => {
+    const val = parseInt(sel.value);
+    if (val >= 0) weekdayLimits[sel.dataset.day] = val;
+  });
+  settings.weekdayLimits = weekdayLimits;
+  await window.foxiAPI.setSettings(settings);
+  const msg = document.getElementById('weekday-save-msg');
+  msg.textContent = '✅ Wochentag-Limits gespeichert!';
+  msg.classList.remove('hidden');
+  setTimeout(() => msg.classList.add('hidden'), 2500);
+});
+
+// Zeitlimit-Vorwarnung
+const timeWarningBanner = document.getElementById('time-warning-banner');
+let warningTimeout = null;
+window.foxiAPI.onTimeWarning(({ remainingSeconds }) => {
+  const mins = Math.ceil(remainingSeconds / 60);
+  document.getElementById('time-warning-text').textContent =
+    mins <= 1 ? 'Noch 1 Minute!' : `Noch ${mins} Minuten!`;
+  timeWarningBanner.classList.remove('hidden');
+  clearTimeout(warningTimeout);
+  warningTimeout = setTimeout(() => timeWarningBanner.classList.add('hidden'), 8000);
 });
 
 // ── Tab: Favoriten-Editor ─────────────────────────────────────────────────

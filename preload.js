@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   onBlocked:          (cb)  => ipcRenderer.on('navigation-blocked', (_, d) => cb(d)),
   onTimeUpdate:       (cb)  => ipcRenderer.on('time-update', (_, d) => cb(d)),
   onTimeLimitReached: (cb)  => ipcRenderer.on('time-limit-reached', () => cb()),
+  onTimeWarning:      (cb)  => ipcRenderer.on('time-warning', (_, d) => cb(d)),
   onUpdateAvailable:  (cb)  => ipcRenderer.on('update-available', (_, info) => cb(info)),
   onUpdateDownloaded: (cb)  => ipcRenderer.on('update-downloaded', (_, info) => cb(info)),
   onPopupRequested:   (cb)  => ipcRenderer.on('popup-requested', (_, url) => cb(url)),
