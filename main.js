@@ -152,23 +152,38 @@ async function createWindow() {
     }
 
     if (fs.existsSync(cachePath)) {
-      const cached = fs.readFileSync(cachePath);
-      activeBlocker = ElectronBlocker.deserialize(cached);
-      console.log('[FoxiBrowser] Adblocker aus Cache geladen');
-      // Hintergrund-Update
-      buildBlocker().then(fresh => {
-        fs.writeFileSync(cachePath, fresh.serialize());
-        console.log('[FoxiBrowser] Adblocker-Listen aktualisiert');
-      }).catch(() => {});
+      try {
+        const cached = fs.readFileSync(cachePath);
+        activeBlocker = ElectronBlocker.deserialize(cached);
+        console.log('[FoxiBrowser] Adblocker aus Cache geladen');
+        // Hintergrund-Update
+        buildBlocker().then(fresh => {
+          fs.writeFileSync(cachePath, fresh.serialize());
+          console.log('[FoxiBrowser] Adblocker-Listen aktualisiert');
+        }).catch(() => {});
+      } catch (_) {
+        // Korrupter Cache – löschen und neu herunterladen
+        console.warn('[FoxiBrowser] Cache korrupt – wird neu heruntergeladen');
+        try { fs.unlinkSync(cachePath); } catch (_) {}
+        buildBlocker().then(fresh => {
+          activeBlocker = fresh;
+          fs.writeFileSync(cachePath, fresh.serialize());
+          try { activeBlocker.enableBlockingInSession(childSession); } catch (_) {}
+        }).catch(() => {});
+      }
     } else {
-      activeBlocker = await buildBlocker();
-      fs.writeFileSync(cachePath, activeBlocker.serialize());
-      console.log('[FoxiBrowser] Adblocker-Listen heruntergeladen');
+      // Kein Cache: im Hintergrund laden damit Fenster sofort erscheint
+      buildBlocker().then(fresh => {
+        activeBlocker = fresh;
+        fs.writeFileSync(cachePath, fresh.serialize());
+        try { activeBlocker.enableBlockingInSession(childSession); } catch (_) {}
+        console.log('[FoxiBrowser] Adblocker-Listen heruntergeladen');
+      }).catch(e => console.warn('[FoxiBrowser] Adblocker-Download fehlgeschlagen:', e.message));
     }
-    activeBlocker.enableBlockingInSession(childSession);
-    console.log('[FoxiBrowser] Werbeblocker aktiv (' +
-      activeBlocker.networkFilters.size + ' Netzwerk-Filter, ' +
-      activeBlocker.cosmeticFilters.size + ' Kosmetik-Filter)');
+    if (activeBlocker) {
+      activeBlocker.enableBlockingInSession(childSession);
+      console.log('[FoxiBrowser] Werbeblocker aktiv');
+    }
   } catch (e) { console.warn('[FoxiBrowser] Adblocker-Fehler:', e.message); }
 
   // Domain-Blockliste
@@ -366,8 +381,24 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
   callback(true);
 });
 
+// ── SINGLE INSTANCE LOCK ─────────────────────────────────────────────────────
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 // ── APP LIFECYCLE ─────────────────────────────────────────────────────────────
-app.whenReady().then(createWindow);
+app.whenReady().then(() => createWindow().catch(e => {
+  console.error('[FoxiBrowser] Kritischer Startfehler:', e);
+  app.quit();
+}));
 
 app.on('window-all-closed', () => {
   if (usageStartTime) {
