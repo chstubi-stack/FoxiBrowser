@@ -40,8 +40,8 @@ nsis:
   shortcutName: FoxiBrowser
   installerIcon: src/assets/icon.ico
   uninstallerIcon: src/assets/icon.ico
-  installerSidebarFile: src/assets/installer-sidebar.bmp
-  installerHeaderFile: src/assets/installer-header.bmp
+  installerSidebar: src/assets/installer-sidebar.bmp
+  installerHeader: src/assets/installer-header.bmp
   deleteAppDataOnUninstall: false
   installerLanguages:
     - de_DE
