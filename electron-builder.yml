@@ -18,6 +18,7 @@ files:
   - src/blocklists/**/*
   - src/assets/icon.png
   - src/assets/icon.ico
+  - "!src/assets/*.bmp"
   - "!**/*.map"
   - "!node_modules/.cache/**"
   - "!src/assets/*.svg"
@@ -39,6 +40,8 @@ nsis:
   shortcutName: FoxiBrowser
   installerIcon: src/assets/icon.ico
   uninstallerIcon: src/assets/icon.ico
+  installerSidebarFile: src/assets/installer-sidebar.bmp
+  installerHeaderFile: src/assets/installer-header.bmp
   deleteAppDataOnUninstall: false
   installerLanguages:
     - de_DE

@@ -16,7 +16,8 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   setSettings:    (s)       => ipcRenderer.invoke('set-settings', s),
   verifyPin:      (pin)     => ipcRenderer.invoke('verify-pin', pin),
   // Verlauf
-  addHistory:     (entry)   => ipcRenderer.invoke('add-history', entry),
+  addHistory:           (entry)  => ipcRenderer.invoke('add-history', entry),
+  updateHistoryDuration:(data)   => ipcRenderer.invoke('update-history-duration', data),
   getHistory:     ()        => ipcRenderer.invoke('get-history'),
   clearHistory:   ()        => ipcRenderer.invoke('clear-history'),
   // Nutzungszeit

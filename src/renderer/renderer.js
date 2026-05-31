@@ -183,7 +183,7 @@ async function submitPin() {
   }
 }
 
-// Numpad-Events
+// Numpad-Events (Maus)
 document.getElementById('pin-numpad').addEventListener('click', e => {
   const btn = e.target.closest('.pin-key');
   if (!btn) return;
@@ -196,6 +196,22 @@ document.getElementById('pin-numpad').addEventListener('click', e => {
     pinBuffer += btn.dataset.digit;
     updatePinDots();
     if (pinBuffer.length === 4) setTimeout(submitPin, 120);
+  }
+});
+
+// Tastatur-Numpad + Zahlenreihe
+document.addEventListener('keydown', e => {
+  if (pinOverlay.classList.contains('hidden')) return;
+  const digit = e.key >= '0' && e.key <= '9' ? e.key : null;
+  if (digit && pinBuffer.length < 4) {
+    pinBuffer += digit;
+    updatePinDots();
+    if (pinBuffer.length === 4) setTimeout(submitPin, 120);
+  } else if (e.key === 'Backspace') {
+    pinBuffer = pinBuffer.slice(0, -1);
+    updatePinDots();
+  } else if (e.key === 'Escape') {
+    closePinDialog();
   }
 });
 
@@ -344,12 +360,24 @@ webview.addEventListener('did-start-loading', () => { setLoading(30); lastBlocke
 webview.addEventListener('did-stop-loading',  () => { setLoading(100); setTimeout(() => setLoading(0), 400); updateNavButtons(); });
 webview.addEventListener('did-fail-load', e  => { setLoading(0); if (e.errorCode !== -3) updateNavButtons(); });
 
-webview.addEventListener('did-navigate', e => {
+let pageStartTime = null;
+let lastHistoryUrl = null;
+
+async function savePageDuration() {
+  if (pageStartTime && lastHistoryUrl) {
+    const duration = Math.round((Date.now() - pageStartTime) / 1000);
+    if (duration > 2) await window.foxiAPI.updateHistoryDuration({ url: lastHistoryUrl, duration });
+  }
+}
+
+webview.addEventListener('did-navigate', async e => {
   if (lastBlockedByMain) return;
+  await savePageDuration();
+  pageStartTime = Date.now();
+  lastHistoryUrl = e.url;
   addressBar.value = e.url;
   updateLockIcon(e.url);
   updateNavButtons();
-  // Verlauf speichern
   window.foxiAPI.addHistory({ url: e.url, title: e.url });
 });
 
@@ -455,18 +483,42 @@ async function loadParentHistory() {
     return;
   }
   list.innerHTML = '';
+  let lastDateStr = '';
   history.forEach(entry => {
-    const row = document.createElement('div');
-    row.className = 'history-entry';
     const d = new Date(entry.time);
-    const timeStr = `${d.toLocaleDateString('de-DE')} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const dateStr = d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' });
+    const timeStr = `${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+
+    // Tages-Trennlinie
+    if (dateStr !== lastDateStr) {
+      lastDateStr = dateStr;
+      const sep = document.createElement('div');
+      sep.className = 'history-date-sep';
+      sep.textContent = dateStr;
+      list.appendChild(sep);
+    }
+
     let host = '';
     try { host = new URL(entry.url).hostname; } catch(_) { host = entry.url; }
+
+    // Verweildauer formatieren
+    let durStr = '';
+    if (entry.duration > 0) {
+      if (entry.duration >= 60) {
+        durStr = `${Math.floor(entry.duration/60)} Min. ${entry.duration%60} Sek.`;
+      } else {
+        durStr = `${entry.duration} Sek.`;
+      }
+    }
+
+    const row = document.createElement('div');
+    row.className = 'history-entry';
     row.innerHTML = `
       <img class="h-favicon" src="https://www.google.com/s2/favicons?domain=${host}&sz=20" alt="">
       <div class="h-info">
         <div class="h-title">${escHtml(entry.title || entry.url)}</div>
         <div class="h-url">${escHtml(entry.url)}</div>
+        ${durStr ? `<div class="h-duration">⏱ ${durStr}</div>` : ''}
       </div>
       <span class="h-time">${timeStr}</span>`;
     row.addEventListener('click', () => {

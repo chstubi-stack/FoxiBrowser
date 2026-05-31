@@ -404,6 +404,12 @@ ipcMain.handle('add-history', async (_, entry) => {
   s.set('history', history);
 });
 ipcMain.handle('get-history',   async () => { const s = await getStore(); return s.get('history', []); });
+ipcMain.handle('update-history-duration', async (_, { url, duration }) => {
+  const s = await getStore();
+  const history = s.get('history', []);
+  const entry = history.find(h => h.url === url);
+  if (entry) { entry.duration = duration; s.set('history', history); }
+});
 ipcMain.handle('clear-history', async () => { const s = await getStore(); s.set('history', []); });
 
 // Nutzungszeit
