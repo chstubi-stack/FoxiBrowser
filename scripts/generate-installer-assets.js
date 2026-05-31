@@ -1,32 +1,25 @@
 'use strict';
-// Erzeugt installer-sidebar.bmp (164x314) und installer-header.bmp (150x57)
 const fs   = require('fs');
 const path = require('path');
 
 function writeBmp(filePath, width, height, drawFn) {
   const rowSize   = Math.ceil((width * 3) / 4) * 4;
   const pixelData = Buffer.alloc(rowSize * height, 0);
-
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const [r, g, b] = drawFn(x, y, width, height);
-      const idx = (height - 1 - y) * rowSize + x * 3; // BMP ist bottom-up
-      pixelData[idx]     = b;
-      pixelData[idx + 1] = g;
-      pixelData[idx + 2] = r;
+      const idx = (height - 1 - y) * rowSize + x * 3;
+      pixelData[idx]     = Math.max(0, Math.min(255, b));
+      pixelData[idx + 1] = Math.max(0, Math.min(255, g));
+      pixelData[idx + 2] = Math.max(0, Math.min(255, r));
     }
   }
-
   const fileSize = 54 + pixelData.length;
   const buf = Buffer.alloc(fileSize);
-
-  // File Header
   buf.write('BM', 0, 'ascii');
   buf.writeUInt32LE(fileSize, 2);
   buf.writeUInt32LE(0, 6);
   buf.writeUInt32LE(54, 10);
-
-  // DIB Header (BITMAPINFOHEADER)
   buf.writeUInt32LE(40, 14);
   buf.writeInt32LE(width,  18);
   buf.writeInt32LE(height, 22);
@@ -38,65 +31,74 @@ function writeBmp(filePath, width, height, drawFn) {
   buf.writeInt32LE(2835, 42);
   buf.writeUInt32LE(0, 46);
   buf.writeUInt32LE(0, 50);
-
   pixelData.copy(buf, 54);
   fs.writeFileSync(filePath, buf);
-  console.log(`✅ ${path.basename(filePath)} (${width}x${height}) erstellt`);
+  console.log(`✅ ${path.basename(filePath)} (${width}x${height})`);
 }
 
-// Hilfsfunktionen
-function hexToRgb(hex) {
-  return [
-    parseInt(hex.slice(1,3),16),
-    parseInt(hex.slice(3,5),16),
-    parseInt(hex.slice(5,7),16),
-  ];
-}
+function lerp(a, b, t) { return Math.round(a + (b - a) * Math.max(0, Math.min(1, t))); }
 
-function lerp(a, b, t) { return Math.round(a + (b - a) * t); }
+// Zeichnet einen gefüllten Kreis, gibt alpha 0..1 zurück
+function circle(x, y, cx, cy, r) {
+  const d = Math.sqrt((x-cx)**2 + (y-cy)**2);
+  return Math.max(0, 1 - d / r);
+}
 
 // ── SIDEBAR (164 x 314) ───────────────────────────────────────────────────
-const [or, og, ob] = hexToRgb('#FF6B35'); // Foxi-Orange
-const [dr, dg, db] = hexToRgb('#1A1A2E'); // Dunkelblau
-
+// Design: Dunkles Navy oben → Orange unten, 3 dekorative Kreise (Foxi-Palette)
 writeBmp(
   path.join(__dirname, '..', 'src', 'assets', 'installer-sidebar.bmp'),
   164, 314,
   (x, y, w, h) => {
-    // Verlauf von oben (orange) nach unten (dunkel)
     const t = y / h;
-    const r = lerp(or, dr, t);
-    const g = lerp(og, dg, t);
-    const b = lerp(ob, db, t);
 
-    // Fuchs-Silhouette (vereinfacht) in der Mitte
-    const cx = w / 2, cy = h * 0.38;
-    const dx = x - cx, dy = y - cy;
+    // Hintergrund-Verlauf: Navy (#1A1A2E) → Dunkelorange (#CC4A10)
+    let r = lerp(26,  180, t);
+    let g = lerp(26,   60, t);
+    let b = lerp(46,   10, t);
 
-    // Kopf-Kreis
-    if (dx*dx + dy*dy < 38*38) {
-      const bright = 1 - Math.sqrt(dx*dx+dy*dy)/38 * 0.3;
-      return [Math.min(255,Math.round(255*bright)), Math.min(255,Math.round(175*bright)), Math.min(255,Math.round(50*bright))];
-    }
-    // Ohren links
-    const elx = x - (cx - 28), ely = y - (cy - 48);
-    if (elx > -5 && elx < 16 && ely > 0 && ely < 28 && elx > ely * 0.1) {
-      return [255, 140, 40];
-    }
-    // Ohren rechts
-    const erx = x - (cx + 28), ery = y - (cy - 48);
-    if (erx > -16 && erx < 5 && ery > 0 && ery < 28 && -erx > ery * 0.1) {
-      return [255, 140, 40];
+    // Dezenter diagonaler Lichtstreifen
+    const stripe = Math.abs(x / w - (1 - t) * 0.6);
+    if (stripe < 0.08) {
+      const bright = (0.08 - stripe) / 0.08 * 0.12;
+      r = Math.min(255, Math.round(r + 255 * bright));
+      g = Math.min(255, Math.round(g + 255 * bright));
+      b = Math.min(255, Math.round(b + 255 * bright));
     }
 
-    // "FoxiBrowser" Text-Bereich (weißer Balken unten)
-    if (y > h * 0.72 && y < h * 0.84) {
-      const alpha = Math.min(1, Math.min(y - h*0.72, h*0.84 - y) / 8);
-      return [
-        lerp(r, 255, alpha * 0.15),
-        lerp(g, 255, alpha * 0.15),
-        lerp(b, 255, alpha * 0.15),
-      ];
+    // Großer Kreis (orange, Mitte oben)
+    const c1 = circle(x, y, w * 0.42, h * 0.28, 52);
+    if (c1 > 0) {
+      const alpha = Math.min(1, c1) * 0.85;
+      r = lerp(r, 255, alpha);
+      g = lerp(g, 107, alpha);
+      b = lerp(b,  53, alpha);
+    }
+
+    // Kleiner Kreis (heller, rechts unten vom großen)
+    const c2 = circle(x, y, w * 0.68, h * 0.38, 22);
+    if (c2 > 0) {
+      const alpha = Math.min(1, c2) * 0.7;
+      r = lerp(r, 255, alpha);
+      g = lerp(g, 140, alpha);
+      b = lerp(b,  66, alpha);
+    }
+
+    // Mini-Kreis (unten links, akzent)
+    const c3 = circle(x, y, w * 0.22, h * 0.72, 14);
+    if (c3 > 0) {
+      const alpha = Math.min(1, c3) * 0.5;
+      r = lerp(r, 255, alpha);
+      g = lerp(g, 180, alpha);
+      b = lerp(b, 100, alpha);
+    }
+
+    // Weißer Balken unten (Text-Bereich Illusion)
+    if (y > h * 0.88) {
+      const fade = (y - h * 0.88) / (h * 0.12);
+      r = lerp(r, 20, fade);
+      g = lerp(g, 20, fade);
+      b = lerp(b, 20, fade);
     }
 
     return [r, g, b];
@@ -104,20 +106,27 @@ writeBmp(
 );
 
 // ── HEADER (150 x 57) ─────────────────────────────────────────────────────
+// Design: Weiß links → Orange rechts (passend zum NSIS-Header-Bereich)
 writeBmp(
   path.join(__dirname, '..', 'src', 'assets', 'installer-header.bmp'),
   150, 57,
   (x, y, w, h) => {
-    // Weißer Hintergrund mit orangem rechten Rand
     const t = x / w;
-    if (x > w * 0.75) {
-      const s = (x - w * 0.75) / (w * 0.25);
+    // Weißer Hintergrund, Orange kommt von rechts rein
+    const r = lerp(255, 220, t);
+    const g = lerp(255,  80, t);
+    const b = lerp(255,  20, t);
+
+    // Kleiner dekorativer Kreis rechts
+    const c = circle(x, y, w * 0.88, h * 0.45, 18);
+    if (c > 0) {
+      const alpha = Math.min(1, c) * 0.25;
       return [
-        lerp(255, or, s),
-        lerp(255, og, s),
-        lerp(255, ob, s),
+        lerp(r, 255, alpha),
+        lerp(g, 255, alpha),
+        lerp(b, 255, alpha),
       ];
     }
-    return [255, 255, 255];
+    return [r, g, b];
   }
 );
