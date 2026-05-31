@@ -475,21 +475,86 @@ document.getElementById('parent-tabs').addEventListener('click', async e => {
 
 // ── Tab: Verlauf ──────────────────────────────────────────────────────────
 
-async function loadParentHistory() {
+let historyFilterDate = null; // null = letzte 48h
+
+function toDateKey(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function buildHistoryDateTabs(history) {
+  const tabs   = document.getElementById('history-date-tabs');
+  const picker = document.getElementById('history-date-picker');
+  tabs.innerHTML = '';
+
+  // Einzigartige Tage sammeln
+  const days = [...new Set(history.map(e => toDateKey(new Date(e.time))))].sort().reverse();
+
+  // "Letzte 48h" Tab
+  const btn48 = document.createElement('button');
+  btn48.type = 'button';
+  btn48.className = 'hd-tab' + (historyFilterDate === null ? ' active' : '');
+  btn48.textContent = '⏱ 48h';
+  btn48.addEventListener('click', () => {
+    historyFilterDate = null;
+    picker.value = '';
+    renderHistory(history);
+  });
+  tabs.appendChild(btn48);
+
+  // Letzten 7 Tage als Tabs
+  days.slice(0, 7).forEach(day => {
+    const d   = new Date(day + 'T12:00:00');
+    const lbl = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hd-tab' + (historyFilterDate === day ? ' active' : '');
+    btn.textContent = lbl;
+    btn.dataset.day = day;
+    btn.addEventListener('click', () => {
+      historyFilterDate = day;
+      picker.value = day;
+      renderHistory(history);
+    });
+    tabs.appendChild(btn);
+  });
+
+  // Datepicker auf max/min setzen
+  if (days.length) {
+    picker.min = days[days.length - 1];
+    picker.max = days[0];
+  }
+  if (historyFilterDate) picker.value = historyFilterDate;
+}
+
+function renderHistory(history) {
   const list = document.getElementById('history-list');
-  const history = await window.foxiAPI.getHistory();
-  if (!history.length) {
-    list.innerHTML = '<p style="color:#555;text-align:center;padding:32px">Kein Verlauf vorhanden.</p>';
+
+  // Filter anwenden
+  let filtered;
+  if (historyFilterDate === null) {
+    const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+    filtered = history.filter(e => e.time >= cutoff);
+  } else {
+    filtered = history.filter(e => toDateKey(new Date(e.time)) === historyFilterDate);
+  }
+
+  // Tabs aktiv markieren
+  document.querySelectorAll('.hd-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.day === historyFilterDate || (!b.dataset.day && historyFilterDate === null));
+  });
+
+  if (!filtered.length) {
+    list.innerHTML = '<p class="history-empty">Kein Verlauf für diesen Zeitraum.</p>';
     return;
   }
+
   list.innerHTML = '';
   let lastDateStr = '';
-  history.forEach(entry => {
-    const d = new Date(entry.time);
+  filtered.forEach(entry => {
+    const d       = new Date(entry.time);
     const dateStr = d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' });
     const timeStr = `${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
 
-    // Tages-Trennlinie
     if (dateStr !== lastDateStr) {
       lastDateStr = dateStr;
       const sep = document.createElement('div');
@@ -501,14 +566,11 @@ async function loadParentHistory() {
     let host = '';
     try { host = new URL(entry.url).hostname; } catch(_) { host = entry.url; }
 
-    // Verweildauer formatieren
     let durStr = '';
     if (entry.duration > 0) {
-      if (entry.duration >= 60) {
-        durStr = `${Math.floor(entry.duration/60)} Min. ${entry.duration%60} Sek.`;
-      } else {
-        durStr = `${entry.duration} Sek.`;
-      }
+      durStr = entry.duration >= 60
+        ? `${Math.floor(entry.duration/60)} Min. ${entry.duration%60} Sek.`
+        : `${entry.duration} Sek.`;
     }
 
     const row = document.createElement('div');
@@ -529,9 +591,23 @@ async function loadParentHistory() {
   });
 }
 
+async function loadParentHistory() {
+  const history = await window.foxiAPI.getHistory();
+  buildHistoryDateTabs(history);
+  renderHistory(history);
+}
+
+// Datepicker manuell ändern
+document.getElementById('history-date-picker').addEventListener('change', async e => {
+  historyFilterDate = e.target.value || null;
+  const history = await window.foxiAPI.getHistory();
+  renderHistory(history);
+});
+
 document.getElementById('btn-clear-history').addEventListener('click', async () => {
   if (!confirm('Verlauf wirklich löschen?')) return;
   await window.foxiAPI.clearHistory();
+  historyFilterDate = null;
   await loadParentHistory();
 });
 
