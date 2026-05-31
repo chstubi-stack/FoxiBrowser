@@ -198,6 +198,7 @@
         <button class="tab-btn" data-tab="favorites">⭐ Startseite</button>
         <button class="tab-btn" data-tab="pin">🔑 PIN ändern</button>
         <button class="tab-btn" data-tab="profile">👶 Kind-Profil</button>
+        <button class="tab-btn" data-tab="bugreport">🐛 Bug melden</button>
       </div>
 
       <!-- Tab: Verlauf -->
@@ -316,6 +317,22 @@
         <div id="pin-info-box">
           <p>💡 <strong>Tipp:</strong> Die Standard-PIN ist <strong>1234</strong>. Bitte ändere sie bei der ersten Nutzung.</p>
         </div>
+      </div>
+
+      <!-- Tab: Bug melden -->
+      <div class="tab-content hidden" id="tab-bugreport">
+        <h3>🐛 Bug melden</h3>
+        <p class="bug-intro">Beschreibe den Fehler kurz – der Bericht wird direkt an die Entwickler geschickt.</p>
+        <div class="form-group">
+          <label>Titel (Kurzbeschreibung)</label>
+          <input type="text" id="bug-title" placeholder="z.B. App startet nicht nach Update" maxlength="120"/>
+        </div>
+        <div class="form-group">
+          <label>Beschreibung (Was ist passiert?)</label>
+          <textarea id="bug-body" rows="5" placeholder="Schreibe hier was genau passiert ist, was du erwartet hast und welche Version du nutzt…" maxlength="2000"></textarea>
+        </div>
+        <p id="bug-msg" class="hidden"></p>
+        <button type="button" class="action-btn" id="btn-send-bug">📤 Bericht absenden</button>
       </div>
 
       <!-- Panel-Footer mit Version -->

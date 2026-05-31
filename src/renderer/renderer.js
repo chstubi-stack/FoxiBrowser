@@ -406,6 +406,26 @@ document.getElementById('parent-close').addEventListener('click', () => {
   parentPanel.classList.add('hidden');
 });
 
+document.getElementById('btn-send-bug').addEventListener('click', async () => {
+  const title = document.getElementById('bug-title').value.trim();
+  const body  = document.getElementById('bug-body').value.trim();
+  const msg   = document.getElementById('bug-msg');
+  if (!title) { msg.textContent = '⚠️ Bitte einen Titel eingeben.'; msg.className = 'error'; msg.classList.remove('hidden'); return; }
+  const btn = document.getElementById('btn-send-bug');
+  btn.disabled = true; btn.textContent = '⏳ Wird gesendet…';
+  const result = await window.foxiAPI.createBugReport({ title, body });
+  btn.disabled = false; btn.textContent = '📤 Bericht absenden';
+  if (result.ok) {
+    msg.textContent = `✅ Bug #${result.number} wurde erfolgreich gemeldet!`;
+    msg.className = 'success'; msg.classList.remove('hidden');
+    document.getElementById('bug-title').value = '';
+    document.getElementById('bug-body').value  = '';
+  } else {
+    msg.textContent = `❌ Fehler: ${result.error}`;
+    msg.className = 'error'; msg.classList.remove('hidden');
+  }
+});
+
 document.getElementById('pwb-min').addEventListener('click',   () => window.foxiAPI.minimize());
 document.getElementById('pwb-max').addEventListener('click',   () => window.foxiAPI.maximize());
 document.getElementById('pwb-close').addEventListener('click', () => window.foxiAPI.close());

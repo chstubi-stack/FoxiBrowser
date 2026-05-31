@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   installUpdate:  ()        => ipcRenderer.send('install-update'),
   openExternal:   (url)     => ipcRenderer.send('open-external', url),
   allowPopup:     (url)     => ipcRenderer.send('allow-popup', url),
+  createBugReport:(data)    => ipcRenderer.invoke('create-bug-report', data),
   onPopupRedirect:(cb)      => ipcRenderer.on('popup-redirect', (_, url) => cb(url)),
   // Events vom Hauptprozess
   onContextMenu:      (cb)  => ipcRenderer.on('context-menu-at', (_, d) => cb(d)),

@@ -280,6 +280,34 @@ ipcMain.on('install-update', () => {
 
 ipcMain.on('open-external', (_, url) => { if (url.startsWith('http')) shell.openExternal(url); });
 
+ipcMain.handle('create-bug-report', async (_, { title, body }) => {
+  const token = process.env.GH_TOKEN ||
+    (() => { try { return require('child_process').execSync(
+      'powershell -command "[System.Environment]::GetEnvironmentVariable(\'GH_TOKEN\',\'User\')"',
+      { encoding: 'utf8' }).trim(); } catch (_) { return ''; } })();
+  if (!token) return { ok: false, error: 'Kein GitHub-Token gefunden.' };
+  try {
+    const res = await fetch('https://api.github.com/repos/chstubi-stack/FoxiBrowser/issues', {
+      method: 'POST',
+      headers: {
+        Authorization: `token ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'FoxiBrowser',
+      },
+      body: JSON.stringify({
+        title: title.trim(),
+        body: `${body.trim()}\n\n---\n_Gesendet von FoxiBrowser v${app.getVersion()}_`,
+        labels: ['bug'],
+      }),
+    });
+    const data = await res.json();
+    if (res.ok) return { ok: true, url: data.html_url, number: data.number };
+    return { ok: false, error: data.message || 'Unbekannter Fehler' };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
 ipcMain.on('allow-popup', (_, url) => {
   try {
     const parsed = new URL(url);
