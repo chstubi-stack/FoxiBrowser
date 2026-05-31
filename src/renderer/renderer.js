@@ -406,6 +406,10 @@ document.getElementById('parent-close').addEventListener('click', () => {
   parentPanel.classList.add('hidden');
 });
 
+document.getElementById('pwb-min').addEventListener('click',   () => window.foxiAPI.minimize());
+document.getElementById('pwb-max').addEventListener('click',   () => window.foxiAPI.maximize());
+document.getElementById('pwb-close').addEventListener('click', () => window.foxiAPI.close());
+
 // Tabs
 document.getElementById('parent-tabs').addEventListener('click', async e => {
   const btn = e.target.closest('.tab-btn');

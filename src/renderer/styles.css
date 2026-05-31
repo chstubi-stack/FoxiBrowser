@@ -360,9 +360,10 @@ html, body {
   border-bottom: 2px solid var(--parent-border);
   flex-shrink: 0;
 }
-#parent-header-left { display: flex; align-items: center; gap: 10px; }
-#parent-lock-icon   { font-size: 22px; }
-#parent-title       { font-size: 20px; font-weight: 900; color: var(--parent-text); }
+#parent-header-left  { display: flex; align-items: center; gap: 10px; }
+#parent-header-right { display: flex; align-items: center; gap: 12px; }
+#parent-lock-icon    { font-size: 22px; }
+#parent-title        { font-size: 20px; font-weight: 900; color: var(--parent-text); }
 #parent-close {
   background: var(--parent-accent); color: white;
   border: none; border-radius: 12px;
@@ -371,6 +372,16 @@ html, body {
   transition: opacity .15s;
 }
 #parent-close:hover { opacity: .8; }
+.parent-win-btns { display: flex; gap: 6px; }
+.pwb {
+  width: 18px; height: 18px; border-radius: 50%; border: none; cursor: pointer;
+  font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center;
+  background: #555; color: rgba(0,0,0,0); transition: color .15s, filter .15s;
+}
+.pwb:hover { color: rgba(0,0,0,0.6); filter: brightness(.85); }
+#pwb-min  { background: #FFBD2E; }
+#pwb-max  { background: #28C840; }
+#pwb-close { background: #FF5F57; }
 
 /* Tabs */
 #parent-tabs {
