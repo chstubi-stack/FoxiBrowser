@@ -321,8 +321,34 @@ async function loadFavorites() {
   renderFavGrid();
 }
 
+function getTimeBadge() {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 11) return '☀️ Guten Morgen!';
+  if (h >= 11 && h < 14) return '🍽️ Mittagszeit';
+  if (h >= 14 && h < 18) return '🌤️ Guten Nachmittag!';
+  if (h >= 18 && h < 22) return '🌆 Guten Abend!';
+  return '🌙 Gute Nacht!';
+}
+
 function applyAgeTheme(age) {
   document.body.setAttribute('data-age', age);
+
+  const badge    = document.getElementById('home-time-badge');
+  const greeting = document.getElementById('home-greeting');
+  const subtitle = document.getElementById('home-subtitle');
+
+  if (badge)    badge.textContent = getTimeBadge();
+
+  if (age === 'klein') {
+    if (greeting) greeting.textContent = 'Hallo! Was möchtest du heute machen? 🦊';
+    if (subtitle) subtitle.textContent = 'Tippe einfach auf ein Bild!';
+  } else if (age === 'gross') {
+    if (greeting) greeting.textContent = 'Hallo! Wohin geht\'s heute?';
+    if (subtitle) subtitle.textContent = 'Tippe auf eine Seite oder gib oben eine Adresse ein.';
+  } else {
+    if (greeting) greeting.textContent = 'Hallo! Wohin möchtest du heute? 🦊';
+    if (subtitle) subtitle.textContent = 'Tippe auf eine Seite oder bitte Mama/Papa um eine neue Adresse.';
+  }
 }
 
 function renderFavGrid() {
