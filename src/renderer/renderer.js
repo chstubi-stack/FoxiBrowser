@@ -341,7 +341,8 @@ btnReload.addEventListener('click',  () => { try { webview.reload();    } catch(
 
 document.getElementById('btn-go-home-blocked').addEventListener('click', showHome);
 document.getElementById('btn-time-parent').addEventListener('click', () => {
-  openPinDialog('Eltern-Bereich', 'PIN eingeben um weiterzusurfen', () => {
+  openPinDialog('Eltern-Bereich', 'PIN eingeben um weiterzusurfen', async () => {
+    await window.foxiAPI.resetUsageToday();
     timeLimitReached = false;
     showHome();
   }, () => {});
