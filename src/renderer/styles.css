@@ -49,26 +49,20 @@ body[data-age="klein"] #titlebar,
 body[data-age="klein"] #navbar {
   background: linear-gradient(135deg, #E91E8C, #F06292);
 }
-/* ── STARTSEITE BASIS ──────────────────────────────────────────── */
+/* ── STARTSEITE ─────────────────────────────────────────────────────── */
 #home-page {
   flex: 1; overflow-y: auto;
   padding: 28px 32px;
   display: flex; flex-direction: column; gap: 20px;
-  position: relative;
-}
-#home-deco {
-  position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0;
 }
 #home-header {
   display: flex; align-items: center; gap: 20px;
-  border-radius: 28px;
-  padding: 22px 28px; box-shadow: var(--foxi-shadow);
-  background: white;
-  position: relative; z-index: 1;
+  border-radius: 24px;
+  padding: 20px 28px; box-shadow: var(--foxi-shadow);
+  background: white; flex-shrink: 0;
 }
-#home-mascot-wrap { flex-shrink: 0; position: relative; }
-#foxi-mascot { width: 90px; height: 90px; display: block; }
-#home-welcome { flex: 1; }
+#foxi-mascot { width: 90px; height: 90px; flex-shrink: 0; display: block; }
+#home-welcome { flex: 1; min-width: 0; }
 #home-time-badge {
   display: inline-block;
   font-size: 12px; font-weight: 700;
@@ -85,7 +79,6 @@ body[data-age="klein"] #navbar {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 16px;
-  position: relative; z-index: 1;
 }
 .fav-card {
   background: white; border-radius: 22px;
@@ -107,34 +100,36 @@ body[data-age="klein"] #navbar {
 .fav-card .fav-emoji { font-size: var(--theme-fav-emoji, 42px); margin-bottom: 10px; line-height: 1; }
 .fav-card span.fav-label { font-size: var(--theme-fav-font, 14px); font-weight: 700; color: var(--foxi-brown); text-align: center; line-height: 1.3; }
 
-/* ── STARTSEITE: KLEIN (3-6) ─────────────────────────────────────── */
+/* ── STARTSEITE: KLEIN (3-6) ────────────────────────────────────────── */
 body[data-age="klein"] #home-page { padding: 20px 24px; }
 body[data-age="klein"] #home-header {
   background: linear-gradient(135deg, #FF8EC6 0%, #FFB347 100%);
   border-radius: 32px; padding: 24px 28px;
 }
-body[data-age="klein"] #home-greeting { color: white; font-size: 26px; text-shadow: 0 2px 6px rgba(0,0,0,.15); }
-body[data-age="klein"] #home-subtitle { color: rgba(255,255,255,.85); font-size: 15px; }
+body[data-age="klein"] #foxi-mascot { width: 100px; height: 100px; }
+body[data-age="klein"] #home-greeting { color: white; font-size: 24px; text-shadow: 0 2px 4px rgba(0,0,0,.15); }
+body[data-age="klein"] #home-subtitle { color: rgba(255,255,255,.85); font-size: 14px; }
 body[data-age="klein"] #home-time-badge { background: rgba(255,255,255,.3); color: white; }
-body[data-age="klein"] #foxi-mascot { width: 110px; height: 110px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.18)); }
 body[data-age="klein"] #favorites-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 20px; }
 body[data-age="klein"] .fav-card { border-radius: 28px; padding: 28px 16px 20px; }
 body[data-age="klein"] .fav-card::before { height: 8px; border-radius: 28px 28px 0 0; }
-body[data-age="klein"] .fav-card .fav-emoji { font-size: 58px; margin-bottom: 12px; }
-body[data-age="klein"] .fav-card img { width: 72px; height: 72px; margin-bottom: 12px; }
+body[data-age="klein"] .fav-card .fav-emoji { font-size: 54px; margin-bottom: 12px; }
+body[data-age="klein"] .fav-card img { width: 68px; height: 68px; margin-bottom: 12px; }
 body[data-age="klein"] .fav-card span.fav-label { font-size: 16px; font-weight: 900; }
-body[data-age="klein"] .fav-card:hover { transform: translateY(-8px) scale(1.06) rotate(-1deg); }
-@keyframes float-deco { from { transform: translateY(0); } to { transform: translateY(-12px); } }
+body[data-age="klein"] .fav-card:hover { transform: translateY(-8px) scale(1.05); }
 
-/* ── STARTSEITE: GROSS (11-14) ───────────────────────────────────── */
+/* ── STARTSEITE: MITTEL (7-10) ──────────────────────────────────────── */
+body[data-age="mittel"] #home-header { background: white; }
+
+/* ── STARTSEITE: GROSS (11-14) ──────────────────────────────────────── */
 body[data-age="gross"] #home-header {
   background: linear-gradient(135deg, #3F51B5 0%, #5C6BC0 100%);
-  border-radius: 20px; padding: 18px 24px; gap: 16px;
+  border-radius: 20px; padding: 16px 22px; gap: 14px;
 }
+body[data-age="gross"] #foxi-mascot { width: 70px; height: 70px; }
 body[data-age="gross"] #home-greeting { color: white; font-size: 18px; font-weight: 800; }
 body[data-age="gross"] #home-subtitle { color: rgba(255,255,255,.75); font-size: 12px; }
 body[data-age="gross"] #home-time-badge { background: rgba(255,255,255,.2); color: white; }
-body[data-age="gross"] #foxi-mascot { width: 70px; height: 70px; }
 body[data-age="gross"] #favorites-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 body[data-age="gross"] .fav-card {
   flex-direction: row; align-items: center;
@@ -145,68 +140,11 @@ body[data-age="gross"] .fav-card::before {
   width: 5px; height: 100%; top: 0; left: 0; right: auto;
   border-radius: 16px 0 0 16px;
 }
-body[data-age="gross"] .fav-card .fav-emoji { font-size: 30px; margin-bottom: 0; flex-shrink: 0; }
-body[data-age="gross"] .fav-card img { width: 36px; height: 36px; margin-bottom: 0; border-radius: 8px; flex-shrink: 0; }
+body[data-age="gross"] .fav-card .fav-emoji { font-size: 28px; margin-bottom: 0; flex-shrink: 0; }
+body[data-age="gross"] .fav-card img { width: 34px; height: 34px; margin-bottom: 0; border-radius: 8px; flex-shrink: 0; }
 body[data-age="gross"] .fav-card span.fav-label { font-size: 14px; font-weight: 700; text-align: left; }
 body[data-age="gross"] .fav-card:hover { transform: translateX(4px); border-color: var(--card-color, #3F51B5); }
 
-/* Klein 3-6: Riesige bunte Karten, Spass-Design */
-body[data-age="klein"] #home-page { padding: 20px 24px; }
-body[data-age="klein"] #home-header {
-  background: linear-gradient(135deg, #FF8EC6 0%, #FFB347 100%);
-  border-radius: 32px; padding: 24px 28px;
-}
-body[data-age="klein"] #home-greeting { color: white; font-size: 26px; text-shadow: 0 2px 6px rgba(0,0,0,.15); }
-body[data-age="klein"] #home-subtitle { color: rgba(255,255,255,.85); font-size: 15px; }
-body[data-age="klein"] #home-time-badge { background: rgba(255,255,255,.3); color: white; }
-body[data-age="klein"] #foxi-mascot { width: 110px; height: 110px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.18)); }
-body[data-age="klein"] #favorites-grid {
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 20px;
-}
-body[data-age="klein"] .fav-card {
-  border-radius: 28px; padding: 28px 16px 20px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.10);
-}
-body[data-age="klein"] .fav-card::before { height: 8px; border-radius: 28px 28px 0 0; }
-body[data-age="klein"] .fav-card .fav-emoji { font-size: 58px; margin-bottom: 12px; }
-body[data-age="klein"] .fav-card img { width: 72px; height: 72px; margin-bottom: 12px; }
-body[data-age="klein"] .fav-card span.fav-label { font-size: 16px; font-weight: 900; }
-body[data-age="klein"] .fav-card:hover { transform: translateY(-8px) scale(1.06) rotate(-1deg); }
-@keyframes float-deco { from { transform: translateY(0); } to { transform: translateY(-12px); } }
-
-/* Mittel 7-10: Sauber, Foxi-Orange, freundlich */
-body[data-age="mittel"] #home-header { background: white; }
-body[data-age="mittel"] #home-greeting { font-size: 22px; }
-body[data-age="mittel"] #favorites-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-body[data-age="mittel"] .fav-card { border-radius: 22px; }
-
-/* Gross 11-14: Kompakt, blau, reifer */
-body[data-age="gross"] #home-header {
-  background: linear-gradient(135deg, #3F51B5 0%, #5C6BC0 100%);
-  border-radius: 20px; padding: 18px 24px; gap: 16px;
-}
-body[data-age="gross"] #home-greeting { color: white; font-size: 18px; font-weight: 800; }
-body[data-age="gross"] #home-subtitle { color: rgba(255,255,255,.75); font-size: 12px; }
-body[data-age="gross"] #home-time-badge { background: rgba(255,255,255,.2); color: white; }
-body[data-age="gross"] #foxi-mascot { width: 70px; height: 70px; }
-body[data-age="gross"] #favorites-grid {
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-}
-body[data-age="gross"] .fav-card {
-  flex-direction: row; align-items: center;
-  padding: 14px 18px; border-radius: 16px; gap: 14px;
-  justify-content: flex-start;
-}
-body[data-age="gross"] .fav-card::before {
-  width: 5px; height: 100%; top: 0; left: 0; right: auto;
-  border-radius: 16px 0 0 16px;
-}
-body[data-age="gross"] .fav-card .fav-emoji { font-size: 30px; margin-bottom: 0; line-height: 1; flex-shrink: 0; }
-body[data-age="gross"] .fav-card img { width: 36px; height: 36px; margin-bottom: 0; border-radius: 8px; flex-shrink: 0; }
-body[data-age="gross"] .fav-card span.fav-label { font-size: 14px; font-weight: 700; text-align: left; }
-body[data-age="gross"] .fav-card:hover { transform: translateX(4px); border-color: var(--card-color, #3F51B5); }
 
 /* â”€â”€ BLOCKIERT-SEITE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 #blocked-page, #time-limit-page {
