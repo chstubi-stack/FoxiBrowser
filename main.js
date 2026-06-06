@@ -284,13 +284,15 @@ async function createWindow() {
 function startAutoUpdater() {
   try {
     const { autoUpdater } = require('electron-updater');
-    autoUpdater.autoDownload    = true;   // Im Hintergrund herunterladen
-    autoUpdater.autoInstallOnAppQuit = true; // Bei nächstem Schließen installieren
+    autoUpdater.autoDownload         = false;
+    autoUpdater.autoInstallOnAppQuit = true;
 
     autoUpdater.on('update-available', info => {
       console.log('[FoxiBrowser] Update verfügbar:', info.version);
       if (mainWindow && !mainWindow.isDestroyed())
         mainWindow.webContents.send('update-available', { version: info.version });
+      // Download manuell starten damit download-progress Events feuern
+      autoUpdater.downloadUpdate().catch(e => console.warn('[FoxiBrowser] Download-Fehler:', e.message));
     });
 
     autoUpdater.on('download-progress', progress => {
