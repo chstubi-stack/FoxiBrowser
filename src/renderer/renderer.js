@@ -404,11 +404,14 @@ window.foxiAPI.onBlocked(data => showBlocked(data));
 
 window.foxiAPI.onTimeUpdate(data => {
   if (data.limitSeconds <= 0) { timeDisplay.classList.add('hidden'); return; }
-  const mins = Math.max(0, Math.ceil(data.remainingSeconds / 60));
+  const totalSecs = Math.max(0, Math.floor(data.remainingSeconds));
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  const secsStr = String(secs).padStart(2, '0');
   timeDisplay.classList.remove('hidden');
-  timeLabel.textContent = `${mins} Min. übrig`;
-  if (mins <= 10) timeDisplay.classList.add('warning');
-  else            timeDisplay.classList.remove('warning');
+  timeLabel.textContent = `${mins}:${secsStr} übrig`;
+  if (totalSecs <= 600) timeDisplay.classList.add('warning');
+  else                  timeDisplay.classList.remove('warning');
 });
 
 window.foxiAPI.onTimeLimitReached(() => showTimeLimitPage());

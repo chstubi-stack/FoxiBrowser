@@ -86,23 +86,37 @@ async function addUsageSeconds(secs) {
 
 let warningSent5min = false;
 let warningSent1min = false;
+let timeLimitActive = false;
+
+async function getLimitMinutes() {
+  const s = await getStore();
+  const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
+  const todayDow   = new Date().getDay();
+  const weekLimits = settings.weekdayLimits || {};
+  return (weekLimits[todayDow] !== undefined)
+    ? weekLimits[todayDow]
+    : (settings.timeLimitMinutes || 0);
+}
+
+function getLiveUsedSeconds() {
+  const stored = _cachedUsedSeconds || 0;
+  if (!usageStartTime) return stored;
+  return stored + Math.floor((Date.now() - usageStartTime) / 1000);
+}
+
+let _cachedUsedSeconds = 0;
+
+async function syncUsedSeconds() {
+  _cachedUsedSeconds = await getUsedSeconds();
+}
 
 async function checkTimeLimit() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const s = await getStore();
-  const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
-
-  // Wochentag-Limit hat Vorrang vor globalem Limit
-  const todayDow   = new Date().getDay(); // 0=So, 1=Mo...
-  const weekLimits = settings.weekdayLimits || {};
-  const limitMins  = (weekLimits[todayDow] !== undefined)
-    ? weekLimits[todayDow]
-    : (settings.timeLimitMinutes || 0);
-
+  const limitMins = await getLimitMinutes();
   if (limitMins <= 0) return;
 
-  const usedSecs    = await getUsedSeconds();
-  const limitSecs   = limitMins * 60;
+  const limitSecs     = limitMins * 60;
+  const usedSecs      = getLiveUsedSeconds();
   const remainingSecs = limitSecs - usedSecs;
 
   mainWindow.webContents.send('time-update', {
@@ -111,22 +125,21 @@ async function checkTimeLimit() {
     remainingSeconds: remainingSecs,
   });
 
-  // Vorwarnung 5 Minuten
   if (remainingSecs <= 300 && remainingSecs > 60 && !warningSent5min) {
     warningSent5min = true;
     mainWindow.webContents.send('time-warning', { remainingSeconds: remainingSecs });
   }
-  // Vorwarnung 1 Minute
   if (remainingSecs <= 60 && remainingSecs > 0 && !warningSent1min) {
     warningSent1min = true;
     mainWindow.webContents.send('time-warning', { remainingSeconds: remainingSecs });
   }
-  // Reset Warnungen wenn Zähler zurückgesetzt wurde
   if (remainingSecs > 300) { warningSent5min = false; warningSent1min = false; }
 
-  if (remainingSecs <= 0) {
+  if (remainingSecs <= 0 && !timeLimitActive) {
+    timeLimitActive = true;
     mainWindow.webContents.send('time-limit-reached');
   }
+  if (remainingSecs > 0) timeLimitActive = false;
 }
 
 // ── HAUPTFENSTER ─────────────────────────────────────────────────────────────
@@ -235,27 +248,33 @@ async function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'src', 'renderer', 'index.html'));
 
   // Nutzungszeit-Tracking
-  mainWindow.on('focus', () => { usageStartTime = Date.now(); });
-  mainWindow.on('blur',  () => {
+  mainWindow.on('focus', async () => {
+    await syncUsedSeconds();
+    usageStartTime = Date.now();
+  });
+  mainWindow.on('blur',  async () => {
     if (usageStartTime) {
       const secs = Math.floor((Date.now() - usageStartTime) / 1000);
-      addUsageSeconds(secs);
+      _cachedUsedSeconds = await addUsageSeconds(secs);
       usageStartTime = null;
     }
   });
 
-  // Jede Minute Nutzungszeit speichern und Limit prüfen
+  // Alle 10 Sekunden echte Nutzungszeit in Store schreiben
   usageCheckInterval = setInterval(async () => {
     if (usageStartTime) {
-      await addUsageSeconds(60);
+      const elapsed = Math.floor((Date.now() - usageStartTime) / 1000);
+      _cachedUsedSeconds = await addUsageSeconds(elapsed);
       usageStartTime = Date.now();
     }
-    await checkTimeLimit();
-  }, 60000);
+  }, 10000);
 
-  // Sofort beim Start prüfen
+  // Jede Sekunde UI aktualisieren und Limit prüfen
+  setInterval(() => { checkTimeLimit(); }, 1000);
+
+  // Sofort beim Start
   usageStartTime = Date.now();
-  setTimeout(checkTimeLimit, 2000);
+  syncUsedSeconds().then(() => checkTimeLimit());
 
   // Auto-Update: 5 Sekunden nach Start prüfen
   setTimeout(startAutoUpdater, 5000);
