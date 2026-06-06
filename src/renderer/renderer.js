@@ -956,12 +956,26 @@ webview.addEventListener('will-navigate', hideCtxMenu);
 // AUTO-UPDATE & VERSION
 // ══════════════════════════════════════════════════════════════════════════
 
-const updateBanner = document.getElementById('update-banner');
+const updateBanner        = document.getElementById('update-banner');
+const updateProgressWrap  = document.getElementById('update-progress-wrap');
+const updateProgressBar   = document.getElementById('update-progress-bar');
+const updateProgressLabel = document.getElementById('update-progress-label');
+const btnInstallUpdate    = document.getElementById('btn-install-update');
 
 window.foxiAPI.onUpdateAvailable(info => {
-  document.getElementById('update-text').textContent =
-    `🦊 Update ${info.version} verfügbar – wird heruntergeladen…`;
+  document.getElementById('update-text').textContent = `🦊 Update ${info.version} wird geladen…`;
+  updateProgressWrap.classList.remove('hidden');
+  btnInstallUpdate.classList.add('hidden');
   updateBanner.classList.remove('hidden');
+});
+
+window.foxiAPI.onUpdateProgress(data => {
+  const pct = data.percent;
+  updateProgressBar.style.width = `${pct}%`;
+  const mb = (data.transferred / 1048576).toFixed(1);
+  const total = (data.total / 1048576).toFixed(1);
+  updateProgressLabel.textContent = `${pct}%`;
+  document.getElementById('update-text').textContent = `🦊 Update – ${mb} / ${total} MB`;
 });
 
 window.foxiAPI.onPopupRequested(url => {
@@ -977,8 +991,13 @@ window.foxiAPI.onPopupRedirect(url => {
 });
 
 window.foxiAPI.onUpdateDownloaded(info => {
-  document.getElementById('update-text').textContent =
-    `✅ Update ${info.version} bereit zum Installieren`;
+  document.getElementById('update-text').textContent = `✅ Update ${info.version} bereit!`;
+  updateProgressBar.style.width = '100%';
+  updateProgressLabel.textContent = '100%';
+  setTimeout(() => {
+    updateProgressWrap.classList.add('hidden');
+    btnInstallUpdate.classList.remove('hidden');
+  }, 600);
   updateBanner.classList.remove('hidden');
 });
 

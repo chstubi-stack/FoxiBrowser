@@ -643,11 +643,14 @@ html, body {
   box-shadow: 0 8px 28px rgba(0,0,0,0.15);
   border-left: 4px solid var(--foxi-orange);
   padding: 14px 18px;
-  display: flex; align-items: center; gap: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+  min-width: 280px; max-width: 340px;
   animation: slide-in .3s ease;
 }
 @keyframes slide-in { from { transform: translateY(20px); opacity:0 } to { transform: none; opacity:1 } }
-#update-text { font-size: 14px; font-weight: 700; color: var(--foxi-brown); }
+#update-banner-top { display: flex; align-items: center; gap: 12px; }
+#update-banner-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+#update-text { font-size: 14px; font-weight: 700; color: var(--foxi-brown); flex: 1; }
 #btn-install-update {
   background: var(--foxi-orange); color: white;
   border: none; border-radius: 9px;
@@ -660,6 +663,19 @@ html, body {
   font-size: 13px; cursor: pointer; font-family: var(--font); padding: 4px;
 }
 #btn-update-later:hover { color: var(--foxi-brown); }
+#update-progress-wrap {
+  display: flex; align-items: center; gap: 10px;
+  background: #f3f3f3; border-radius: 8px; padding: 6px 10px;
+}
+#update-progress-bar {
+  flex: 1; height: 8px; border-radius: 4px;
+  background: linear-gradient(90deg, var(--foxi-orange), #ffb347);
+  width: 0%; transition: width 0.4s ease;
+}
+#update-progress-label {
+  font-size: 12px; font-weight: 700; color: var(--foxi-brown);
+  min-width: 36px; text-align: right;
+}
 
 /* â”€â”€ PARENT PANEL FOOTER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 #parent-footer {

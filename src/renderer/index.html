@@ -387,9 +387,17 @@
   </div>
 
   <div id="update-banner" class="hidden">
-    <span id="update-text">🦊 Update verfügbar!</span>
-    <button id="btn-install-update">Jetzt installieren</button>
-    <button id="btn-update-later">Später</button>
+    <div id="update-banner-top">
+      <span id="update-text">🦊 Update verfügbar!</span>
+      <div id="update-banner-actions">
+        <button id="btn-install-update" class="hidden">Jetzt installieren</button>
+        <button id="btn-update-later">Später</button>
+      </div>
+    </div>
+    <div id="update-progress-wrap" class="hidden">
+      <div id="update-progress-bar"></div>
+      <span id="update-progress-label">0 %</span>
+    </div>
   </div>
 
   <script src="renderer.js"></script>

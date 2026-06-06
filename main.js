@@ -293,6 +293,16 @@ function startAutoUpdater() {
         mainWindow.webContents.send('update-available', { version: info.version });
     });
 
+    autoUpdater.on('download-progress', progress => {
+      if (mainWindow && !mainWindow.isDestroyed())
+        mainWindow.webContents.send('update-progress', {
+          percent: Math.round(progress.percent),
+          transferred: progress.transferred,
+          total: progress.total,
+          bytesPerSecond: progress.bytesPerSecond,
+        });
+    });
+
     autoUpdater.on('update-downloaded', info => {
       console.log('[FoxiBrowser] Update heruntergeladen:', info.version);
       if (mainWindow && !mainWindow.isDestroyed())
