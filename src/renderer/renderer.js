@@ -1118,88 +1118,102 @@ window.foxiAPI.onRemoteSetAge(age => {
 
 // ── Chat-Overlay (Nachricht von Eltern) ──────────────────────────────────
 (function initChat() {
-  // Overlay-HTML einfügen
   const overlay = document.createElement('div');
   overlay.id = 'chat-overlay';
   overlay.style.cssText = 'display:none;position:fixed;bottom:90px;right:24px;width:320px;max-width:calc(100vw - 48px);z-index:9999;font-family:Nunito,sans-serif';
-  overlay.innerHTML = `
-    <div style="background:#1e1e1e;border:2px solid #FF6B35;border-radius:18px;box-shadow:0 8px 32px rgba(0,0,0,.6);overflow:hidden">
-      <div style="background:#FF6B35;padding:10px 16px;display:flex;align-items:center;justify-content:space-between">
-        <span style="color:#fff;font-weight:800;font-size:.95rem">💬 Nachricht von Mama/Papa</span>
-        <button id="chat-overlay-close" style="background:transparent;border:none;color:#fff;font-size:1.2rem;cursor:pointer;line-height:1">✕</button>
-      </div>
-      <div id="chat-overlay-msgs" style="max-height:220px;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px"></div>
-      <div style="padding:10px 14px;border-top:1px solid #333;display:flex;gap:8px">
-        <input id="chat-overlay-input" type="text" placeholder="Antwort schreiben…" maxlength="300"
-          style="flex:1;background:#141414;color:#eee;border:1px solid #444;border-radius:10px;padding:8px 12px;font-size:.9rem;font-family:inherit;outline:none"
-          onkeydown="if(event.key==='Enter')chatSendReply()">
-        <button onclick="chatSendReply()" style="background:#FF6B35;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer">➤</button>
-      </div>
-    </div>`;
+
+  const msgBox  = document.createElement('div');
+  const input   = document.createElement('input');
+  const sendBtn = document.createElement('button');
+
+  // Nachrichten-Container
+  msgBox.id = 'chat-overlay-msgs';
+  msgBox.style.cssText = 'max-height:220px;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px';
+
+  // Eingabe
+  input.id = 'chat-overlay-input';
+  input.type = 'text';
+  input.placeholder = 'Antwort schreiben…';
+  input.maxLength = 300;
+  input.style.cssText = 'flex:1;background:#141414;color:#eee;border:1px solid #444;border-radius:10px;padding:8px 12px;font-size:.9rem;font-family:inherit;outline:none';
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') doSend(); });
+
+  // Senden-Button
+  sendBtn.textContent = '➤';
+  sendBtn.style.cssText = 'background:#FF6B35;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:1rem';
+  sendBtn.addEventListener('click', doSend);
+
+  // Overlay zusammenbauen
+  const header = document.createElement('div');
+  header.style.cssText = 'background:#FF6B35;padding:10px 16px;display:flex;align-items:center;justify-content:space-between';
+  const title = document.createElement('span');
+  title.style.cssText = 'color:#fff;font-weight:800;font-size:.95rem';
+  title.textContent = '💬 Nachricht von Mama/Papa';
+  const closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:1.2rem;cursor:pointer;line-height:1';
+  closeBtn.textContent = '✕';
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+
+  const footer = document.createElement('div');
+  footer.style.cssText = 'padding:10px 14px;border-top:1px solid #333;display:flex;gap:8px';
+  footer.appendChild(input);
+  footer.appendChild(sendBtn);
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#1e1e1e;border:2px solid #FF6B35;border-radius:18px;box-shadow:0 8px 32px rgba(0,0,0,.6);overflow:hidden';
+  card.appendChild(header);
+  card.appendChild(msgBox);
+  card.appendChild(footer);
+  overlay.appendChild(card);
   document.body.appendChild(overlay);
 
-  // Benachrichtigungs-Badge (Bubble-Button wenn Overlay versteckt)
+  // Badge-Button (sichtbar wenn Overlay geschlossen)
   const badge = document.createElement('button');
-  badge.id = 'chat-badge-btn';
   badge.style.cssText = 'display:none;position:fixed;bottom:90px;right:24px;z-index:9998;background:#FF6B35;color:#fff;border:none;border-radius:50%;width:54px;height:54px;font-size:1.4rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5)';
-  badge.innerHTML = '💬';
-  badge.onclick = () => { badge.style.display = 'none'; overlay.style.display = ''; };
+  badge.textContent = '💬';
   document.body.appendChild(badge);
 
-  document.getElementById('chat-overlay-close').onclick = () => {
-    overlay.style.display = 'none';
-    badge.style.display = '';
-  };
+  closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; badge.style.display = ''; });
+  badge.addEventListener('click',    () => { badge.style.display = 'none'; overlay.style.display = ''; scrollMsgs(); });
 
-  let chatPort = 7777;
-  window.foxiAPI.getRemotePort().then(p => { if (p) chatPort = p; });
+  function scrollMsgs() { msgBox.scrollTop = msgBox.scrollHeight; }
 
-  function appendOverlayMsg(m) {
-    const box = document.getElementById('chat-overlay-msgs');
+  function appendMsg(m) {
     const isParent = m.from === 'parent';
     const t = new Date(m.time);
     const ts = t.getHours() + ':' + String(t.getMinutes()).padStart(2,'0');
+    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
     const wrap = document.createElement('div');
     wrap.style.cssText = 'display:flex;flex-direction:column;' + (isParent ? 'align-items:flex-start' : 'align-items:flex-end');
-    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     wrap.innerHTML =
       '<div style="max-width:85%;background:' + (isParent ? '#FF6B35' : '#2a2a2a') + ';color:#fff;padding:8px 12px;border-radius:' +
       (isParent ? '14px 14px 14px 4px' : '14px 14px 4px 14px') +
       ';font-size:.88rem;line-height:1.4;word-break:break-word">' + esc(m.text) + '</div>' +
       '<span style="font-size:.7rem;color:#666;margin-top:2px">' + (isParent ? '👨 Eltern' : 'Du') + ' · ' + ts + '</span>';
-    box.appendChild(wrap);
-    box.scrollTop = box.scrollHeight;
+    msgBox.appendChild(wrap);
+    scrollMsgs();
   }
 
-  let chatLastTime = 0;
-  window.chatMsgs = [];
-
-  // Wenn Hauptprozess direkt per IPC meldet (Eltern schickt Nachricht)
+  // Nachrichten vom Elternteil kommen direkt per IPC (kein Polling nötig)
   window.foxiAPI.onChatMessage(msg => {
-    if (msg.time > chatLastTime) {
-      chatLastTime = msg.time;
-      appendOverlayMsg(msg);
-      window.chatMsgs.push(msg);
-    }
+    appendMsg(msg);
     overlay.style.display = '';
     badge.style.display = 'none';
+    scrollMsgs();
   });
 
-  window.chatSendReply = async function() {
-    const inp = document.getElementById('chat-overlay-input');
-    const text = inp.value.trim();
+  async function doSend() {
+    const text = input.value.trim();
     if (!text) return;
-    inp.value = '';
-    const msg = { from: 'child', text, time: Date.now() };
-    appendOverlayMsg(msg);
-    try {
-      await fetch('http://127.0.0.1:' + chatPort + '/api/child-reply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      });
-    } catch(_) {}
-  };
+    input.value = '';
+    input.focus();
+    // Sofort lokal anzeigen
+    appendMsg({ from: 'child', text, time: Date.now() });
+    // Per IPC an Hauptprozess → landet im chatMessages-Array, Fernzugriff sieht es per Polling
+    await window.foxiAPI.childChatReply(text);
+  }
 })();
 
 // Remote-Tab öffnen → Status laden

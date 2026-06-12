@@ -52,5 +52,5 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   reportChildNav:     (url, title) => ipcRenderer.send('child-navigated', { url, title }),
   // Chat
   onChatMessage:      (cb)  => ipcRenderer.on('chat-message', (_, msg) => cb(msg)),
-  getRemotePort:      ()    => ipcRenderer.invoke('get-remote-port'),
+  childChatReply:     (txt) => ipcRenderer.invoke('child-chat-reply', txt),
 });

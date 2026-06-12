@@ -835,8 +835,10 @@ function rhFilter(date, btn) {
 })();
 
 // ── Chat ─────────────────────────────────────────────────────────
-let chatLastTime = 0;
-let chatUnread   = 0;
+let chatLastTime  = 0;
+let chatUnread    = 0;
+let chatFetching  = false; // verhindert parallele Polls
+const chatSeen    = new Set(); // dedupliziert nach Zeitstempel
 
 function appendChatMsg(m) {
   const box = document.getElementById('chat-messages');
@@ -865,8 +867,13 @@ async function sendMsg() {
   const text = inp.value.trim();
   if (!text) return;
   inp.value = '';
+  // Direkt lokal anzeigen, dann senden
+  const now = Date.now();
+  chatSeen.add(now);
+  appendChatMsg({ from: 'parent', text, time: now });
   await fetch('/send-message', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'text=' + encodeURIComponent(text) });
-  await pollChat();
+  // chatLastTime auf den gerade gesendeten Zeitpunkt setzen damit Polling ihn nicht nochmal holt
+  if (now > chatLastTime) chatLastTime = now;
 }
 async function clearChat() {
   if (!confirm('Chat wirklich löschen?')) return;
@@ -874,21 +881,24 @@ async function clearChat() {
   document.getElementById('chat-messages').innerHTML = '';
   chatLastTime = 0;
   chatUnread = 0;
+  chatSeen.clear();
   updateChatBadge();
 }
 async function pollChat() {
+  if (chatFetching) return;
+  chatFetching = true;
   try {
     const r = await fetch('/api/chat?since=' + chatLastTime);
     const msgs = await r.json();
     for (const m of msgs) {
+      if (chatSeen.has(m.time)) continue; // bereits angezeigt
+      chatSeen.add(m.time);
       appendChatMsg(m);
       if (m.time > chatLastTime) chatLastTime = m.time;
-      if (m.from === 'child') {
-        chatUnread++;
-        updateChatBadge();
-      }
+      if (m.from === 'child') { chatUnread++; updateChatBadge(); }
     }
   } catch(_) {}
+  chatFetching = false;
 }
 function updateChatBadge() {
   const btn = document.getElementById('chat-tab-btn');
@@ -1360,6 +1370,14 @@ ipcMain.handle('get-remote-status', async () => {
   return { enabled, ip: getLocalIp(), port: REMOTE_PORT, paused: remotePaused };
 });
 ipcMain.handle('get-remote-port', () => REMOTE_PORT);
+// Kind schickt Antwort per IPC (kein HTTP-Fetch nötig)
+ipcMain.handle('child-chat-reply', (_, text) => {
+  const t = (text || '').trim().substring(0, 500);
+  if (!t) return;
+  const msg = { from: 'child', text: t, time: Date.now() };
+  chatMessages.push(msg);
+  if (chatMessages.length > 100) chatMessages = chatMessages.slice(-100);
+});
 ipcMain.handle('set-remote-enabled', async (_, enabled) => {
   const s = await getStore();
   const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
