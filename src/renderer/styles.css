@@ -771,3 +771,85 @@ body[data-age="gross"] .fav-card .fav-emoji { font-size: 28px; margin-bottom: 0;
 body[data-age="gross"] .fav-card img { width: 34px; height: 34px; margin-bottom: 0; border-radius: 8px; flex-shrink: 0; }
 body[data-age="gross"] .fav-card span.fav-label { font-size: 14px; font-weight: 700; text-align: left; }
 body[data-age="gross"] .fav-card:hover { transform: translateX(4px); border-color: var(--card-color, #3F51B5); }
+
+/* ── FERNZUGRIFF (Remote Control Tab) ─────────────────────────────────────── */
+.remote-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 20px 0;
+}
+#remote-toggle-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+}
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 28px;
+  cursor: pointer;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #ccc;
+  border-radius: 28px;
+  transition: background .3s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .3s;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+}
+.toggle-switch input:checked + .toggle-slider { background: var(--foxi-green); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(24px); }
+#remote-info-box {
+  background: #f0fff4;
+  border: 2px solid var(--foxi-green);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-top: 8px;
+}
+#remote-url-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 8px 0 4px;
+}
+#remote-url-text {
+  font-family: monospace;
+  font-size: 1rem;
+  color: #1565c0;
+  font-weight: 700;
+  flex: 1;
+}
+#btn-copy-remote-url {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: background .2s;
+}
+#btn-copy-remote-url:hover { background: #eee; }
+.remote-pin-hint { margin-top: 8px; }

@@ -3,6 +3,8 @@
 const { app, BrowserWindow, ipcMain, session, screen, shell } = require('electron');
 const path = require('path');
 const fs   = require('fs');
+const http = require('http');
+const os   = require('os');
 
 // DNS-over-HTTPS: Cloudflare for Families
 if (app && app.commandLine) {
@@ -278,6 +280,12 @@ async function createWindow() {
 
   // Auto-Update: 5 Sekunden nach Start prüfen
   setTimeout(startAutoUpdater, 5000);
+
+  // Remote-Server starten falls in Einstellungen aktiviert
+  getStore().then(s => {
+    const settings = s.get('settings', {});
+    if (settings.remoteEnabled) startRemoteServer();
+  });
 }
 
 // ── AUTO-UPDATER ──────────────────────────────────────────────────────────────
@@ -320,6 +328,142 @@ function startAutoUpdater() {
   } catch (e) {
     console.warn('[FoxiBrowser] Auto-Updater nicht verfügbar:', e.message);
   }
+}
+
+// ── REMOTE CONTROL SERVER ─────────────────────────────────────────────────────
+const REMOTE_PORT = 7777;
+let remoteServer  = null;
+let remotePaused  = false;
+
+function getLocalIp() {
+  for (const iface of Object.values(os.networkInterfaces())) {
+    for (const info of iface) {
+      if (info.family === 'IPv4' && !info.internal) return info.address;
+    }
+  }
+  return '127.0.0.1';
+}
+
+function remoteHtml() {
+  const status = remotePaused ? 'pausiert' : 'aktiv';
+  const statusColor = remotePaused ? '#e53935' : '#43a047';
+  const pausedAttr = remotePaused ? '1' : '0';
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FoxiBrowser Fernsteuerung</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,sans-serif;background:#f5f5f5;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+  .card{background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.1);text-align:center}
+  h1{font-size:1.4rem;color:#333;margin-bottom:8px}
+  .fox{font-size:3rem;margin-bottom:12px}
+  .status{display:inline-block;padding:6px 18px;border-radius:20px;font-weight:700;color:#fff;background:${statusColor};margin:12px 0 24px}
+  input{width:100%;border:2px solid #ddd;border-radius:10px;padding:12px;font-size:1rem;margin-bottom:16px;outline:none}
+  input:focus{border-color:#FF6B35}
+  .btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-size:1.1rem;font-weight:700;cursor:pointer;margin-bottom:12px;transition:opacity .2s}
+  .btn-pause{background:#e53935;color:#fff}
+  .btn-resume{background:#43a047;color:#fff}
+  .btn:hover{opacity:.85}
+  .err{color:#e53935;font-size:.9rem;margin-top:4px;min-height:20px}
+  .hint{color:#999;font-size:.8rem;margin-top:20px}
+</style>
+</head>
+<body data-paused="${pausedAttr}">
+<div class="card">
+  <div class="fox">🦊</div>
+  <h1>FoxiBrowser Fernsteuerung</h1>
+  <div class="status">Browser ${status}</div>
+  <form id="frm">
+    <input type="password" id="pin" placeholder="Eltern-PIN eingeben" autocomplete="current-password" required>
+    <p class="err" id="err"></p>
+    ${remotePaused
+      ? `<button class="btn btn-resume" data-action="resume">▶ Surfen wieder erlauben</button>`
+      : `<button class="btn btn-pause" data-action="pause">⏸ Surfen pausieren</button>`
+    }
+  </form>
+  <p class="hint">Die PIN ist dieselbe wie im Eltern-Bereich des Browsers.</p>
+</div>
+<script>
+document.getElementById('frm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = e.submitter;
+  const action = btn ? btn.dataset.action : (document.body.dataset.paused === '1' ? 'resume' : 'pause');
+  const pin = document.getElementById('pin').value;
+  document.getElementById('err').textContent = '';
+  try {
+    const r = await fetch('/action', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({action, pin})
+    });
+    const d = await r.json();
+    if (d.ok) { location.reload(); }
+    else { document.getElementById('err').textContent = d.error || 'Fehler'; }
+  } catch(_) { document.getElementById('err').textContent = 'Verbindungsfehler'; }
+});
+// Seite alle 10s neu laden damit Status aktuell ist
+setTimeout(() => location.reload(), 10000);
+</script>
+</body>
+</html>`;
+}
+
+async function startRemoteServer() {
+  if (remoteServer) return;
+  const store = await getStore();
+  remoteServer = http.createServer(async (req, res) => {
+    if (req.method === 'GET' && req.url === '/') {
+      const html = remoteHtml();
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/action') {
+      let body = '';
+      req.on('data', c => { body += c; });
+      req.on('end', async () => {
+        try {
+          const { action, pin } = JSON.parse(body);
+          const settings = store.get('settings', { pin: '1234' });
+          if (pin !== settings.pin) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'Falsche PIN' }));
+            return;
+          }
+          if (action === 'pause') {
+            remotePaused = true;
+            if (mainWindow && !mainWindow.isDestroyed())
+              mainWindow.webContents.send('remote-pause');
+          } else if (action === 'resume') {
+            remotePaused = false;
+            if (mainWindow && !mainWindow.isDestroyed())
+              mainWindow.webContents.send('remote-resume');
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (_) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Ungültige Anfrage' }));
+        }
+      });
+      return;
+    }
+    res.writeHead(404); res.end();
+  });
+  remoteServer.listen(REMOTE_PORT, '0.0.0.0', () => {
+    console.log(`[FoxiBrowser] Remote-Server läuft auf Port ${REMOTE_PORT}`);
+  });
+}
+
+function stopRemoteServer() {
+  if (!remoteServer) return;
+  remoteServer.close();
+  remoteServer = null;
+  remotePaused = false;
+  console.log('[FoxiBrowser] Remote-Server gestoppt');
 }
 
 // ── IPC HANDLER ───────────────────────────────────────────────────────────────
@@ -461,6 +605,22 @@ ipcMain.handle('reset-usage-today', async () => {
   const data = s.get('usageData', {});
   delete data[todayKey()];
   s.set('usageData', data);
+});
+
+// Remote Control
+ipcMain.handle('get-remote-status', async () => {
+  const s = await getStore();
+  const enabled = s.get('settings', {}).remoteEnabled || false;
+  return { enabled, ip: getLocalIp(), port: REMOTE_PORT, paused: remotePaused };
+});
+ipcMain.handle('set-remote-enabled', async (_, enabled) => {
+  const s = await getStore();
+  const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
+  settings.remoteEnabled = enabled;
+  s.set('settings', settings);
+  if (enabled) await startRemoteServer();
+  else stopRemoteServer();
+  return { ok: true, ip: getLocalIp(), port: REMOTE_PORT };
 });
 
 // ── ZERTIFIKATSFEHLER AUTOMATISCH AKZEPTIEREN ────────────────────────────────

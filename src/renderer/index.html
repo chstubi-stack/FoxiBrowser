@@ -200,6 +200,7 @@
         <button class="tab-btn" data-tab="pin">🔑 PIN ändern</button>
         <button class="tab-btn" data-tab="profile">👶 Kind-Profil</button>
         <button class="tab-btn" data-tab="bugreport">🐛 Bug melden</button>
+        <button class="tab-btn" data-tab="remote">🌐 Fernzugriff</button>
       </div>
 
       <!-- Tab: Verlauf -->
@@ -354,6 +355,27 @@
         </div>
         <p id="bug-msg" class="hidden"></p>
         <button type="button" class="action-btn" id="btn-send-bug">📤 Bericht absenden</button>
+      </div>
+
+      <!-- Tab: Fernzugriff -->
+      <div class="tab-content hidden" id="tab-remote">
+        <h3>🌐 Fernzugriff im Netzwerk</h3>
+        <p class="hint-text">Wenn aktiviert, kannst du den Browser von einem anderen Gerät im selben WLAN steuern – z.B. um eine Pause einzulegen.</p>
+        <div class="remote-toggle-row">
+          <label class="toggle-switch" for="remote-enabled-checkbox" title="Fernzugriff ein-/ausschalten">
+            <input type="checkbox" id="remote-enabled-checkbox" aria-label="Fernzugriff aktivieren">
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="remote-toggle-label">Fernzugriff deaktiviert</span>
+        </div>
+        <div id="remote-info-box" class="hidden">
+          <p class="hint-text">Öffne diese Adresse auf einem anderen Gerät im selben WLAN:</p>
+          <div id="remote-url-display">
+            <span id="remote-url-text">wird geladen…</span>
+            <button type="button" id="btn-copy-remote-url" title="Kopieren">📋</button>
+          </div>
+          <p class="hint-text remote-pin-hint">Die PIN des Eltern-Bereichs wird auch dort benötigt.</p>
+        </div>
       </div>
 
       <!-- Panel-Footer mit Version -->

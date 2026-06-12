@@ -1057,6 +1057,66 @@ document.getElementById('btn-check-update').addEventListener('click', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════
+// FERNZUGRIFF (Remote Control)
+// ══════════════════════════════════════════════════════════════════════════
+
+const remoteCheckbox  = document.getElementById('remote-enabled-checkbox');
+const remoteLabel     = document.getElementById('remote-toggle-label');
+const remoteInfoBox   = document.getElementById('remote-info-box');
+const remoteUrlText   = document.getElementById('remote-url-text');
+const btnCopyRemote   = document.getElementById('btn-copy-remote-url');
+
+async function loadRemoteStatus() {
+  const status = await window.foxiAPI.getRemoteStatus();
+  remoteCheckbox.checked = status.enabled;
+  if (status.enabled) {
+    remoteLabel.textContent = 'Fernzugriff aktiv';
+    remoteInfoBox.classList.remove('hidden');
+    remoteUrlText.textContent = `http://${status.ip}:${status.port}`;
+  } else {
+    remoteLabel.textContent = 'Fernzugriff deaktiviert';
+    remoteInfoBox.classList.add('hidden');
+  }
+}
+
+remoteCheckbox.addEventListener('change', async () => {
+  const enabled = remoteCheckbox.checked;
+  remoteCheckbox.disabled = true;
+  const result = await window.foxiAPI.setRemoteEnabled(enabled);
+  remoteCheckbox.disabled = false;
+  if (enabled) {
+    remoteLabel.textContent = 'Fernzugriff aktiv';
+    remoteInfoBox.classList.remove('hidden');
+    remoteUrlText.textContent = `http://${result.ip}:${result.port}`;
+  } else {
+    remoteLabel.textContent = 'Fernzugriff deaktiviert';
+    remoteInfoBox.classList.add('hidden');
+  }
+});
+
+btnCopyRemote.addEventListener('click', () => {
+  navigator.clipboard.writeText(remoteUrlText.textContent).catch(() => {});
+  btnCopyRemote.textContent = '✓';
+  setTimeout(() => { btnCopyRemote.textContent = '📋'; }, 1500);
+});
+
+// Remote-Pause/Resume vom Hauptprozess empfangen
+window.foxiAPI.onRemotePause(() => {
+  timeLimitReached = true;
+  showTimeLimitPage();
+});
+window.foxiAPI.onRemoteResume(() => {
+  timeLimitReached = false;
+  showHome();
+});
+
+// Remote-Tab öffnen → Status laden
+document.getElementById('parent-tabs').addEventListener('click', async e => {
+  const btn = e.target.closest('.tab-btn[data-tab="remote"]');
+  if (btn) await loadRemoteStatus();
+}, true);
+
+// ══════════════════════════════════════════════════════════════════════════
 // START
 // ══════════════════════════════════════════════════════════════════════════
 
