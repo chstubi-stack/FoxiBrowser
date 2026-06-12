@@ -50,4 +50,7 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   onRemoteResume:     (cb)  => ipcRenderer.on('remote-resume', () => cb()),
   onRemoteSetAge:     (cb)  => ipcRenderer.on('remote-set-age', (_, age) => cb(age)),
   reportChildNav:     (url, title) => ipcRenderer.send('child-navigated', { url, title }),
+  // Chat
+  onChatMessage:      (cb)  => ipcRenderer.on('chat-message', (_, msg) => cb(msg)),
+  getRemotePort:      ()    => ipcRenderer.invoke('get-remote-port'),
 });

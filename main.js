@@ -340,6 +340,8 @@ let remoteServer     = null;
 let remotePaused     = false;
 let currentChildUrl  = '';
 let currentChildTitle = '';
+// Chat zwischen Eltern (remote) und Kind (Browser)
+let chatMessages = []; // [{from:'parent'|'child', text, time}]
 
 function getLocalIp() {
   for (const iface of Object.values(os.networkInterfaces())) {
@@ -403,9 +405,12 @@ function remoteMainHtml(data) {
     if (!secs || secs <= 0) return '';
     return secs >= 60 ? `${Math.floor(secs/60)} Min. ${secs%60} Sek.` : `${secs} Sek.`;
   }
+  // Alle verfügbaren Tage sammeln für Schnellbuttons
+  const historyDays = [...new Set(history.map(h => new Date(h.time).toISOString().slice(0,10)))].sort().reverse();
+
   let historyHtml = '';
   let lastDateKey = '';
-  for (const h of history.slice(0, 200)) {
+  for (const h of history) {
     const d   = new Date(h.time);
     const dateKey = d.toISOString().slice(0,10);
     const dateLabel = d.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long' });
@@ -417,9 +422,9 @@ function remoteMainHtml(data) {
     const urlShort = esc(h.url.substring(0, 80));
     if (dateKey !== lastDateKey) {
       lastDateKey = dateKey;
-      historyHtml += `<div class="rh-sep">${esc(dateLabel)}</div>`;
+      historyHtml += `<div class="rh-sep" data-date="${dateKey}">${esc(dateLabel)}</div>`;
     }
-    historyHtml += `<div class="rh-entry">
+    historyHtml += `<div class="rh-entry" data-date="${dateKey}">
       <img class="rh-fav" src="https://www.google.com/s2/favicons?domain=${esc(host)}&sz=20" alt="" onerror="this.style.display='none'">
       <div class="rh-info">
         <div class="rh-title">${title}</div>
@@ -429,7 +434,16 @@ function remoteMainHtml(data) {
       <span class="rh-time">${timeStr}</span>
     </div>`;
   }
-  if (!historyHtml) historyHtml = '<p style="color:#888;padding:20px 0;font-size:.9rem">Noch keine Seiten besucht.</p>';
+  if (!historyHtml) historyHtml = '<p id="rh-empty" style="color:#888;padding:20px 0;font-size:.9rem">Noch keine Seiten besucht.</p>';
+
+  // Schnellbutton-Labels für verfügbare Tage
+  const todayStr = new Date().toISOString().slice(0,10);
+  const yesterStr = (() => { const y = new Date(); y.setDate(y.getDate()-1); return y.toISOString().slice(0,10); })();
+  const dayBtns = historyDays.slice(0,7).map(dk => {
+    let label = dk === todayStr ? 'Heute' : dk === yesterStr ? 'Gestern'
+      : new Date(dk+'T12:00:00').toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' });
+    return `<button class="rh-day-btn" data-date="${dk}">${label}</button>`;
+  }).join('');
 
   const weekBars = usageWeek.map(d => {
     const mins = Math.floor(d.seconds / 60);
@@ -511,6 +525,7 @@ function remoteMainHtml(data) {
   .r-preset:hover{border-color:#FF6B35;color:#FF6B35}
   .r-preset-active{background:#FF6B35!important;color:#fff!important;border-color:#FF6B35!important}
   .rh-list{max-height:60vh;overflow-y:auto;margin:0 -18px;padding:0 18px 18px}
+  .rh-day-active{background:#FF6B35!important;color:#fff!important;border-color:#FF6B35!important}
   .rh-sep{font-size:.75rem;font-weight:800;color:#777;text-transform:uppercase;letter-spacing:.8px;padding:14px 0 6px;border-bottom:1px solid #2a2a2a;margin-bottom:6px}
   .rh-entry{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;border:1px solid transparent;transition:border-color .15s,background .15s;margin-bottom:4px}
   .rh-entry:hover{background:#1a1a1a;border-color:#333}
@@ -551,6 +566,7 @@ function remoteMainHtml(data) {
 <div class="tabs">
   <button class="tab active" onclick="showTab('time',this)">⏰ Nutzungszeit</button>
   <button class="tab" onclick="showTab('history',this)">📋 Verlauf</button>
+  <button class="tab" id="chat-tab-btn" onclick="showTab('chat',this)">💬 Nachricht</button>
   <button class="tab" onclick="showTab('settings',this)">⚙️ Einstellungen</button>
 </div>
 
@@ -614,7 +630,31 @@ function remoteMainHtml(data) {
         <button type="submit" style="background:#c62828;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:700;font-size:.82rem;cursor:pointer">🗑 Verlauf löschen</button>
       </form>
     </div>
-    <div class="rh-list">${historyHtml}</div>
+    <!-- Datum-Filter -->
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="r-preset rh-day-active" data-date="all" onclick="rhFilter('all',this)">Alle</button>
+      ${dayBtns ? dayBtns.replace(/class="rh-day-btn"/g, 'class="r-preset" onclick="rhFilter(this.dataset.date,this)"') : ''}
+      <input type="date" id="rh-date-picker" style="background:#1e1e1e;color:#eee;border:1px solid #333;border-radius:8px;padding:6px 10px;font-size:.85rem;cursor:pointer;font-family:inherit" onchange="rhFilter(this.value,null)">
+      <span id="rh-count" style="margin-left:auto;font-size:.8rem;color:#777"></span>
+    </div>
+    <div id="rh-empty-msg" style="display:none;color:#888;padding:20px 0;font-size:.9rem">Keine Einträge für diesen Tag.</div>
+    <div class="rh-list" id="rh-list">${historyHtml}</div>
+  </div>
+</div>
+
+<div id="tab-chat" class="panel">
+  <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 220px);min-height:300px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
+      <h2 style="margin-bottom:0">💬 Nachricht ans Kind</h2>
+      <button onclick="clearChat()" style="background:transparent;color:#666;border:1px solid #333;border-radius:8px;padding:5px 12px;font-size:.8rem;cursor:pointer">🗑 Löschen</button>
+    </div>
+    <div id="chat-messages" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-bottom:8px"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-shrink:0">
+      <input id="chat-input" type="text" placeholder="Nachricht schreiben…" maxlength="500"
+        style="flex:1;background:#1e1e1e;color:#eee;border:1px solid #333;border-radius:10px;padding:10px 14px;font-size:.95rem;font-family:inherit;outline:none"
+        onkeydown="if(event.key==='Enter')sendMsg()">
+      <button onclick="sendMsg()" style="background:#FF6B35;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-weight:700;font-size:.95rem;cursor:pointer;white-space:nowrap">Senden ➤</button>
+    </div>
   </div>
 </div>
 
@@ -759,6 +799,113 @@ async function poll() {
   } catch(_) {}
 }
 setInterval(poll, 3000);
+
+// Verlauf-Datum-Filter
+function rhFilter(date, btn) {
+  const entries = document.querySelectorAll('#rh-list .rh-entry, #rh-list .rh-sep');
+  let visible = 0;
+  entries.forEach(el => {
+    const show = date === 'all' || el.dataset.date === date;
+    el.style.display = show ? '' : 'none';
+    if (show && el.classList.contains('rh-entry')) visible++;
+  });
+  document.getElementById('rh-empty-msg').style.display = visible === 0 ? '' : 'none';
+  const countEl = document.getElementById('rh-count');
+  if (countEl) countEl.textContent = date === 'all' ? '' : visible + ' Einträge';
+  // Picker synchronisieren
+  const picker = document.getElementById('rh-date-picker');
+  if (picker && date !== 'all') picker.value = date;
+  else if (picker && date === 'all') picker.value = '';
+  // Aktiven Button markieren
+  document.querySelectorAll('[data-date].r-preset').forEach(b => b.classList.remove('rh-day-active'));
+  if (btn) btn.classList.add('rh-day-active');
+  else if (date === 'all') {
+    const allBtn = document.querySelector('[data-date="all"]');
+    if (allBtn) allBtn.classList.add('rh-day-active');
+  }
+}
+// Beim Laden: Heute anzeigen wenn vorhanden, sonst alle
+(function() {
+  const today = new Date().toISOString().slice(0,10);
+  const hasToday = !!document.querySelector('#rh-list .rh-entry[data-date="' + today + '"]');
+  if (hasToday) {
+    const todayBtn = document.querySelector('[data-date="' + today + '"]');
+    rhFilter(today, todayBtn);
+  }
+})();
+
+// ── Chat ─────────────────────────────────────────────────────────
+let chatLastTime = 0;
+let chatUnread   = 0;
+
+function appendChatMsg(m) {
+  const box = document.getElementById('chat-messages');
+  if (!box) return;
+  const isParent = m.from === 'parent';
+  const t = new Date(m.time);
+  const ts = t.getHours() + ':' + String(t.getMinutes()).padStart(2,'0');
+  const bubble = document.createElement('div');
+  bubble.style.cssText = [
+    'display:flex', 'flex-direction:column',
+    isParent ? 'align-items:flex-end' : 'align-items:flex-start'
+  ].join(';');
+  bubble.innerHTML =
+    '<div style="max-width:80%;background:' + (isParent ? '#FF6B35' : '#2a2a2a') + ';color:#fff;padding:9px 14px;border-radius:' +
+    (isParent ? '14px 14px 4px 14px' : '14px 14px 14px 4px') +
+    ';font-size:.9rem;line-height:1.4;word-break:break-word">' + escHtml(m.text) + '</div>' +
+    '<span style="font-size:.72rem;color:#666;margin-top:3px">' + (isParent ? 'Du' : '👦 Kind') + ' · ' + ts + '</span>';
+  box.appendChild(bubble);
+  box.scrollTop = box.scrollHeight;
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+async function sendMsg() {
+  const inp = document.getElementById('chat-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  await fetch('/send-message', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'text=' + encodeURIComponent(text) });
+  await pollChat();
+}
+async function clearChat() {
+  if (!confirm('Chat wirklich löschen?')) return;
+  await fetch('/clear-chat', { method:'POST' });
+  document.getElementById('chat-messages').innerHTML = '';
+  chatLastTime = 0;
+  chatUnread = 0;
+  updateChatBadge();
+}
+async function pollChat() {
+  try {
+    const r = await fetch('/api/chat?since=' + chatLastTime);
+    const msgs = await r.json();
+    for (const m of msgs) {
+      appendChatMsg(m);
+      if (m.time > chatLastTime) chatLastTime = m.time;
+      if (m.from === 'child') {
+        chatUnread++;
+        updateChatBadge();
+      }
+    }
+  } catch(_) {}
+}
+function updateChatBadge() {
+  const btn = document.getElementById('chat-tab-btn');
+  if (!btn) return;
+  if (chatUnread > 0) {
+    btn.innerHTML = '💬 Nachricht <span style="background:#c62828;color:#fff;border-radius:10px;padding:1px 7px;font-size:.75rem;margin-left:4px">' + chatUnread + '</span>';
+  } else {
+    btn.innerHTML = '💬 Nachricht';
+  }
+}
+// Chat-Badge leeren wenn Tab geöffnet wird
+document.getElementById('chat-tab-btn').addEventListener('click', () => {
+  chatUnread = 0;
+  updateChatBadge();
+});
+setInterval(pollChat, 3000);
+pollChat();
 </script>
 </body>
 </html>`;
@@ -937,6 +1084,56 @@ async function startRemoteServer() {
       store.set('settings', settings);
       res.writeHead(302, { Location: '/' });
       res.end();
+      return;
+    }
+
+    // ── Eltern schickt Nachricht ans Kind ───────────────────────
+    if (url === '/send-message' && req.method === 'POST') {
+      if (!isAuthenticated(req)) { res.writeHead(302, { Location: '/login' }); res.end(); return; }
+      const form = parseForm(await readBody(req));
+      const text = (form.text || '').trim().substring(0, 500);
+      if (text) {
+        const msg = { from: 'parent', text, time: Date.now() };
+        chatMessages.push(msg);
+        if (chatMessages.length > 100) chatMessages = chatMessages.slice(-100);
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('chat-message', msg);
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    // ── Kind antwortet (vom Browser) ─────────────────────────────
+    if (url === '/api/child-reply' && req.method === 'POST') {
+      const body = await readBody(req);
+      let data = {};
+      try { data = JSON.parse(body); } catch(_) {}
+      const text = (data.text || '').trim().substring(0, 500);
+      if (text) {
+        const msg = { from: 'child', text, time: Date.now() };
+        chatMessages.push(msg);
+        if (chatMessages.length > 100) chatMessages = chatMessages.slice(-100);
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    // ── Chat-Nachrichten abrufen (Polling) ───────────────────────
+    if (url.startsWith('/api/chat') && req.method === 'GET') {
+      const since = parseInt(new URL('http://x' + url).searchParams.get('since') || '0', 10);
+      const msgs = chatMessages.filter(m => m.time > since);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(msgs));
+      return;
+    }
+
+    // ── Chat leeren ──────────────────────────────────────────────
+    if (url === '/clear-chat' && req.method === 'POST') {
+      if (!isAuthenticated(req)) { res.writeHead(302, { Location: '/login' }); res.end(); return; }
+      chatMessages = [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
       return;
     }
 
@@ -1162,6 +1359,7 @@ ipcMain.handle('get-remote-status', async () => {
   const enabled = s.get('settings', {}).remoteEnabled || false;
   return { enabled, ip: getLocalIp(), port: REMOTE_PORT, paused: remotePaused };
 });
+ipcMain.handle('get-remote-port', () => REMOTE_PORT);
 ipcMain.handle('set-remote-enabled', async (_, enabled) => {
   const s = await getStore();
   const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
