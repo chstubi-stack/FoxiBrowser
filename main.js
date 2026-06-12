@@ -397,12 +397,39 @@ function remoteMainHtml(data) {
   const limitOptions = [0,30,60,90,120,180,240,300,360,480,600,720];
   const limitLabel = m => m <= 0 ? 'Kein Limit' : m < 60 ? `${m} Min.` : m % 60 === 0 ? `${m/60} Std.` : `${Math.floor(m/60)}h ${m%60}m`;
 
-  const historyRows = history.slice(0, 50).map(h => {
-    const d = new Date(h.time);
-    const t = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-    const host = (() => { try { return new URL(h.url).hostname.replace(/^www\./,''); } catch(_){ return h.url; } })();
-    return `<tr><td class="h-time">${t}</td><td class="h-host">${host}</td><td class="h-title">${(h.title||'').substring(0,60)}</td></tr>`;
-  }).join('');
+  // Verlauf gruppiert nach Datum
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function durStr(secs) {
+    if (!secs || secs <= 0) return '';
+    return secs >= 60 ? `${Math.floor(secs/60)} Min. ${secs%60} Sek.` : `${secs} Sek.`;
+  }
+  let historyHtml = '';
+  let lastDateKey = '';
+  for (const h of history.slice(0, 200)) {
+    const d   = new Date(h.time);
+    const dateKey = d.toISOString().slice(0,10);
+    const dateLabel = d.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long' });
+    const timeStr = `${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+    let host = h.url;
+    try { host = new URL(h.url).hostname.replace(/^www\./,''); } catch(_) {}
+    const dur = durStr(h.duration);
+    const title = esc((h.title && h.title !== h.url ? h.title : host).substring(0, 80));
+    const urlShort = esc(h.url.substring(0, 80));
+    if (dateKey !== lastDateKey) {
+      lastDateKey = dateKey;
+      historyHtml += `<div class="rh-sep">${esc(dateLabel)}</div>`;
+    }
+    historyHtml += `<div class="rh-entry">
+      <img class="rh-fav" src="https://www.google.com/s2/favicons?domain=${esc(host)}&sz=20" alt="" onerror="this.style.display='none'">
+      <div class="rh-info">
+        <div class="rh-title">${title}</div>
+        <div class="rh-url">${urlShort}</div>
+        ${dur ? `<div class="rh-dur">⏱ ${dur}</div>` : ''}
+      </div>
+      <span class="rh-time">${timeStr}</span>
+    </div>`;
+  }
+  if (!historyHtml) historyHtml = '<p style="color:#888;padding:20px 0;font-size:.9rem">Noch keine Seiten besucht.</p>';
 
   const weekBars = usageWeek.map(d => {
     const mins = Math.floor(d.seconds / 60);
@@ -483,6 +510,16 @@ function remoteMainHtml(data) {
   .r-preset{background:#2a2a2a;color:#aaa;border:1px solid #333;border-radius:8px;padding:7px 14px;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}
   .r-preset:hover{border-color:#FF6B35;color:#FF6B35}
   .r-preset-active{background:#FF6B35!important;color:#fff!important;border-color:#FF6B35!important}
+  .rh-list{max-height:60vh;overflow-y:auto;margin:0 -18px;padding:0 18px 18px}
+  .rh-sep{font-size:.75rem;font-weight:800;color:#777;text-transform:uppercase;letter-spacing:.8px;padding:14px 0 6px;border-bottom:1px solid #2a2a2a;margin-bottom:6px}
+  .rh-entry{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;border:1px solid transparent;transition:border-color .15s,background .15s;margin-bottom:4px}
+  .rh-entry:hover{background:#1a1a1a;border-color:#333}
+  .rh-fav{width:18px;height:18px;border-radius:3px;flex-shrink:0;opacity:.8}
+  .rh-info{flex:1;min-width:0}
+  .rh-title{font-size:.85rem;font-weight:700;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rh-url{font-size:.75rem;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .rh-dur{font-size:.75rem;color:#FF6B35;font-weight:700;margin-top:2px}
+  .rh-time{font-size:.75rem;color:#555;flex-shrink:0;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -569,9 +606,15 @@ function remoteMainHtml(data) {
 </div>
 
 <div id="tab-history" class="panel">
-  <div class="card">
-    <h2>Besuchte Seiten (letzte 50)</h2>
-    ${historyRows ? `<table><tbody>${historyRows}</tbody></table>` : '<p style="color:#888;font-size:.9rem">Noch keine Seiten besucht.</p>'}
+  <div class="card" style="padding-bottom:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 style="margin-bottom:0">Besuchte Seiten</h2>
+      <form method="POST" action="/clear-history" style="margin:0"
+        onsubmit="return confirm('Verlauf wirklich löschen?')">
+        <button type="submit" style="background:#c62828;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:700;font-size:.82rem;cursor:pointer">🗑 Verlauf löschen</button>
+      </form>
+    </div>
+    <div class="rh-list">${historyHtml}</div>
   </div>
 </div>
 
@@ -812,6 +855,14 @@ async function startRemoteServer() {
       settings.timeLimitMinutes = limit;
       store.set('settings', settings);
       res.writeHead(302, { Location: '/' });
+      res.end();
+      return;
+    }
+
+    // ── Verlauf löschen ──────────────────────────────────────────
+    if (url === '/clear-history' && req.method === 'POST') {
+      store.set('history', []);
+      res.writeHead(302, { Location: '/#history' });
       res.end();
       return;
     }
