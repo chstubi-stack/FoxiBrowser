@@ -686,27 +686,35 @@ async function startRemoteServer() {
   });
 }
 
-function runElevatedNetsh(args) {
+function runElevatedCmd(command) {
+  // VBScript ShellExecute mit "runas" – einzige zuverlässige UAC-Methode in Electron
   return new Promise(resolve => {
-    // Temp-Skript schreiben und erhöht ausführen – zuverlässiger als inline args
-    const tmpScript = path.join(app.getPath('temp'), 'foxi_fw.ps1');
-    fs.writeFileSync(tmpScript, `netsh advfirewall firewall ${args}\r\n`, 'utf8');
-    const cmd = `powershell -ExecutionPolicy Bypass -Command "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-ExecutionPolicy Bypass -File \\"${tmpScript.replace(/\\/g, '\\\\')}\\""`;
-    exec(cmd, err => {
-      try { fs.unlinkSync(tmpScript); } catch (_) {}
-      if (err) console.warn('[FoxiBrowser] Firewall-Fehler:', err.message);
-      else console.log('[FoxiBrowser] Firewall-Befehl ausgeführt:', args);
+    const tmpBat = path.join(app.getPath('temp'), 'foxi_fw.bat');
+    const tmpVbs = path.join(app.getPath('temp'), 'foxi_fw.vbs');
+    // ANSI-Encoding (kein BOM) – VBScript-Anforderung
+    const batContent = `@echo off\r\n${command}\r\n`;
+    const vbsContent = `Set sh = CreateObject("Shell.Application")\r\nsh.ShellExecute "${tmpBat.replace(/\\/g, '\\\\')}", "", "", "runas", 0\r\nWScript.Sleep 5000\r\n`;
+    fs.writeFileSync(tmpBat, batContent, { encoding: 'latin1' });
+    fs.writeFileSync(tmpVbs, vbsContent, { encoding: 'latin1' });
+    exec(`cscript //nologo "${tmpVbs}"`, err => {
+      try { fs.unlinkSync(tmpBat); } catch (_) {}
+      try { fs.unlinkSync(tmpVbs); } catch (_) {}
+      if (err) console.warn('[FoxiBrowser] Firewall-UAC-Fehler:', err.message);
+      else console.log('[FoxiBrowser] Firewall-Befehl ausgeführt');
       resolve(!err);
     });
   });
 }
 
 function addFirewallRule() {
-  return runElevatedNetsh(`add rule name="FoxiBrowser Fernzugriff" dir=in action=allow protocol=TCP localport=${REMOTE_PORT} enable=yes`);
+  return runElevatedCmd(
+    `netsh advfirewall firewall delete rule name="FoxiBrowser Fernzugriff" & ` +
+    `netsh advfirewall firewall add rule name="FoxiBrowser Fernzugriff" dir=in action=allow protocol=TCP localport=${REMOTE_PORT} enable=yes`
+  );
 }
 
 function removeFirewallRule() {
-  runElevatedNetsh(`delete rule name="FoxiBrowser Fernzugriff"`);
+  runElevatedCmd(`netsh advfirewall firewall delete rule name="FoxiBrowser Fernzugriff"`);
 }
 
 function stopRemoteServer() {
