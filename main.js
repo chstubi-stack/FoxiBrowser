@@ -336,8 +336,10 @@ function startAutoUpdater() {
 
 // ── REMOTE CONTROL SERVER ─────────────────────────────────────────────────────
 const REMOTE_PORT = 7777;
-let remoteServer  = null;
-let remotePaused  = false;
+let remoteServer     = null;
+let remotePaused     = false;
+let currentChildUrl  = '';
+let currentChildTitle = '';
 
 function getLocalIp() {
   for (const iface of Object.values(os.networkInterfaces())) {
@@ -385,7 +387,7 @@ function remoteLoginHtml(error) {
 }
 
 function remoteMainHtml(data) {
-  const { history, usageToday, usageWeek, settings, paused } = data;
+  const { history, usageToday, usageWeek, settings, paused, childUrl, childTitle } = data;
   const usedMin = Math.floor(usageToday / 60);
   const usedSec = usageToday % 60;
   const limitMin = settings.timeLimitMinutes || 0;
@@ -421,10 +423,13 @@ function remoteMainHtml(data) {
   header .fox{font-size:1.6rem}
   header h1{font-size:1.1rem;font-weight:800}
   header .logout{margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;padding:8px 16px;border-radius:20px;cursor:pointer;font-size:.85rem;font-weight:700}
-  .status-bar{display:flex;align-items:center;gap:12px;padding:14px 20px;background:#fff;border-bottom:2px solid #eee}
+  .status-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 20px;background:#fff;border-bottom:2px solid #eee}
   .status-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
   .status-dot.active{background:#43a047} .status-dot.paused{background:#e53935}
   .status-text{font-weight:700;font-size:1rem}
+  .current-page{font-size:.8rem;color:#666;background:#f5f5f5;border-radius:8px;padding:5px 10px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+  .current-page a{color:#1565c0;text-decoration:none;font-weight:600}
+  .current-page.home{color:#999;font-style:italic}
   .pause-btn{margin-left:auto;padding:10px 22px;border:none;border-radius:12px;font-weight:800;font-size:.95rem;cursor:pointer}
   .pause-btn.do-pause{background:#e53935;color:#fff} .pause-btn.do-resume{background:#43a047;color:#fff}
   .tabs{display:flex;gap:0;background:#fff;border-bottom:2px solid #eee;overflow-x:auto}
@@ -472,10 +477,20 @@ function remoteMainHtml(data) {
 
 <div class="status-bar">
   <div class="status-dot ${paused ? 'paused' : 'active'}"></div>
-  <span class="status-text">${paused ? '⏸ Surfen pausiert' : '▶ Kind surft gerade'}</span>
-  <form method="POST" action="/action" style="margin:0">
+  <span class="status-text">${paused ? '⏸ Pausiert' : '▶ Aktiv'}</span>
+  ${(() => {
+    if (paused) return `<span class="current-page home">Surfen ist pausiert</span>`;
+    if (!childUrl || childUrl === 'about:blank' || childUrl === '') {
+      return `<span class="current-page home">🏠 Startseite</span>`;
+    }
+    let host = childUrl;
+    try { host = new URL(childUrl).hostname.replace(/^www\./, ''); } catch(_) {}
+    const displayTitle = childTitle || host;
+    return `<span class="current-page" title="${childUrl.replace(/"/g,'&quot;')}">🌐 <a href="${childUrl.replace(/"/g,'&quot;')}" target="_blank">${displayTitle.substring(0,60)}</a><br><small style="color:#aaa">${host}</small></span>`;
+  })()}
+  <form method="POST" action="/action" style="margin:0;margin-left:auto">
     <input type="hidden" name="action" value="${paused ? 'resume' : 'pause'}">
-    <button type="submit" class="pause-btn ${paused ? 'do-resume' : 'do-pause'}">${paused ? '▶ Surfen freigeben' : '⏸ Pause'}</button>
+    <button type="submit" class="pause-btn ${paused ? 'do-resume' : 'do-pause'}">${paused ? '▶ Freigeben' : '⏸ Pause'}</button>
   </form>
 </div>
 
@@ -672,7 +687,7 @@ async function startRemoteServer() {
         const key = d.toISOString().slice(0, 10);
         usageWeek.push({ date: key, seconds: key === today ? getLiveUsedSeconds() : (usageData[key] || 0) });
       }
-      const html = remoteMainHtml({ history, usageToday, usageWeek, settings, paused: remotePaused });
+      const html = remoteMainHtml({ history, usageToday, usageWeek, settings, paused: remotePaused, childUrl: currentChildUrl, childTitle: currentChildTitle });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
       return;
@@ -864,6 +879,12 @@ ipcMain.handle('reset-usage-today', async () => {
   const data = s.get('usageData', {});
   delete data[todayKey()];
   s.set('usageData', data);
+});
+
+// Aktuelle Seite des Kindes tracken
+ipcMain.on('child-navigated', (_, { url, title }) => {
+  currentChildUrl   = url  || '';
+  currentChildTitle = title || '';
 });
 
 // Remote Control

@@ -89,6 +89,7 @@ function showHome() {
   lockIcon.style.opacity = '0.35';
   btnBack.disabled = btnForward.disabled = btnReload.disabled = true;
   try { webview.loadURL('about:blank'); } catch (_) {}
+  window.foxiAPI.reportChildNav('', '');
 }
 
 function showBrowser(url) {
@@ -406,6 +407,7 @@ webview.addEventListener('did-navigate', async e => {
   updateLockIcon(e.url);
   updateNavButtons();
   window.foxiAPI.addHistory({ url: e.url, title: e.url });
+  window.foxiAPI.reportChildNav(e.url, e.url);
 });
 
 webview.addEventListener('did-navigate-in-page', e => {
@@ -413,12 +415,13 @@ webview.addEventListener('did-navigate-in-page', e => {
   addressBar.value = e.url;
   updateLockIcon(e.url);
   updateNavButtons();
+  window.foxiAPI.reportChildNav(e.url, document.title.replace(' – FoxiBrowser', ''));
 });
 
 webview.addEventListener('page-title-updated', e => {
   document.title = e.title ? `${e.title} – FoxiBrowser` : 'FoxiBrowser';
-  // Titel im Verlauf nachträglich ergänzen
   if (addressBar.value) window.foxiAPI.addHistory({ url: addressBar.value, title: e.title });
+  window.foxiAPI.reportChildNav(addressBar.value, e.title);
 });
 
 // Blockiert-Meldung vom Hauptprozess
