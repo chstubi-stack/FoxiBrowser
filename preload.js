@@ -48,4 +48,5 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   setRemoteEnabled:   (enabled) => ipcRenderer.invoke('set-remote-enabled', enabled),
   onRemotePause:      (cb)  => ipcRenderer.on('remote-pause', () => cb()),
   onRemoteResume:     (cb)  => ipcRenderer.on('remote-resume', () => cb()),
+  onRemoteSetAge:     (cb)  => ipcRenderer.on('remote-set-age', (_, age) => cb(age)),
 });

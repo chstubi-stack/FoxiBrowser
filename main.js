@@ -348,135 +348,365 @@ function getLocalIp() {
   return '127.0.0.1';
 }
 
-function remoteHtml() {
-  const status = remotePaused ? 'pausiert' : 'aktiv';
-  const statusColor = remotePaused ? '#e53935' : '#43a047';
-  const pausedAttr = remotePaused ? '1' : '0';
+function remoteLoginHtml(error) {
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FoxiBrowser Fernsteuerung</title>
+<title>FoxiBrowser – Eltern-Login</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:system-ui,sans-serif;background:#f5f5f5;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-  .card{background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.1);text-align:center}
-  h1{font-size:1.4rem;color:#333;margin-bottom:8px}
-  .fox{font-size:3rem;margin-bottom:12px}
-  .status{display:inline-block;padding:6px 18px;border-radius:20px;font-weight:700;color:#fff;background:${statusColor};margin:12px 0 24px}
-  input{width:100%;border:2px solid #ddd;border-radius:10px;padding:12px;font-size:1rem;margin-bottom:16px;outline:none}
+  body{font-family:system-ui,sans-serif;background:#FF6B35;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+  .card{background:#fff;border-radius:20px;padding:36px 32px;max-width:380px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.2);text-align:center}
+  .fox{font-size:3.5rem;margin-bottom:8px}
+  h1{font-size:1.3rem;color:#333;margin-bottom:4px}
+  .sub{color:#888;font-size:.9rem;margin-bottom:24px}
+  input{width:100%;border:2px solid #eee;border-radius:12px;padding:14px;font-size:1.2rem;text-align:center;letter-spacing:6px;outline:none;margin-bottom:12px}
   input:focus{border-color:#FF6B35}
-  .btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-size:1.1rem;font-weight:700;cursor:pointer;margin-bottom:12px;transition:opacity .2s}
-  .btn-pause{background:#e53935;color:#fff}
-  .btn-resume{background:#43a047;color:#fff}
-  .btn:hover{opacity:.85}
-  .err{color:#e53935;font-size:.9rem;margin-top:4px;min-height:20px}
-  .hint{color:#999;font-size:.8rem;margin-top:20px}
+  button{width:100%;padding:14px;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;background:#FF6B35;color:#fff}
+  button:hover{background:#e55a25}
+  .err{color:#e53935;font-size:.9rem;margin-top:10px;min-height:18px}
 </style>
 </head>
-<body data-paused="${pausedAttr}">
+<body>
 <div class="card">
   <div class="fox">🦊</div>
-  <h1>FoxiBrowser Fernsteuerung</h1>
-  <div class="status">Browser ${status}</div>
-  <form id="frm">
-    <input type="password" id="pin" placeholder="Eltern-PIN eingeben" autocomplete="current-password" required>
-    <p class="err" id="err"></p>
-    ${remotePaused
-      ? `<button class="btn btn-resume" data-action="resume">▶ Surfen wieder erlauben</button>`
-      : `<button class="btn btn-pause" data-action="pause">⏸ Surfen pausieren</button>`
-    }
+  <h1>FoxiBrowser Eltern-Bereich</h1>
+  <p class="sub">Fernzugriff – bitte PIN eingeben</p>
+  <form method="POST" action="/login">
+    <input type="password" name="pin" placeholder="PIN" autocomplete="current-password" autofocus maxlength="8">
+    <p class="err">${error || ''}</p>
+    <button type="submit">Anmelden</button>
   </form>
-  <p class="hint">Die PIN ist dieselbe wie im Eltern-Bereich des Browsers.</p>
 </div>
+</body>
+</html>`;
+}
+
+function remoteMainHtml(data) {
+  const { history, usageToday, usageWeek, settings, paused } = data;
+  const usedMin = Math.floor(usageToday / 60);
+  const usedSec = usageToday % 60;
+  const limitMin = settings.timeLimitMinutes || 0;
+  const usedPct  = limitMin > 0 ? Math.min(100, Math.round(usageToday / (limitMin * 60) * 100)) : 0;
+
+  const historyRows = history.slice(0, 50).map(h => {
+    const d = new Date(h.time);
+    const t = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+    const host = (() => { try { return new URL(h.url).hostname.replace(/^www\./,''); } catch(_){ return h.url; } })();
+    return `<tr><td class="h-time">${t}</td><td class="h-host">${host}</td><td class="h-title">${(h.title||'').substring(0,60)}</td></tr>`;
+  }).join('');
+
+  const weekBars = usageWeek.map(d => {
+    const mins = Math.floor(d.seconds / 60);
+    const pct  = limitMin > 0 ? Math.min(100, Math.round(d.seconds / (limitMin * 60) * 100)) : Math.min(100, Math.round(mins / 60 * 100));
+    const day  = new Date(d.date + 'T12:00:00').toLocaleDateString('de-DE', {weekday:'short'});
+    return `<div class="wb"><div class="wb-bar" style="height:${pct}%"></div><div class="wb-label">${day}</div><div class="wb-val">${mins}m</div></div>`;
+  }).join('');
+
+  const ageLabels = { klein:'Klein (3–6)', mittel:'Mittel (7–10)', gross:'Groß (11–14)' };
+  const currentAge = settings.childAge || 'mittel';
+
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FoxiBrowser – Eltern-Bereich</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,sans-serif;background:#f5f5f5;color:#222;min-height:100vh}
+  header{background:#FF6B35;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+  header .fox{font-size:1.6rem}
+  header h1{font-size:1.1rem;font-weight:800}
+  header .logout{margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;padding:8px 16px;border-radius:20px;cursor:pointer;font-size:.85rem;font-weight:700}
+  .status-bar{display:flex;align-items:center;gap:12px;padding:14px 20px;background:#fff;border-bottom:2px solid #eee}
+  .status-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+  .status-dot.active{background:#43a047} .status-dot.paused{background:#e53935}
+  .status-text{font-weight:700;font-size:1rem}
+  .pause-btn{margin-left:auto;padding:10px 22px;border:none;border-radius:12px;font-weight:800;font-size:.95rem;cursor:pointer}
+  .pause-btn.do-pause{background:#e53935;color:#fff} .pause-btn.do-resume{background:#43a047;color:#fff}
+  .tabs{display:flex;gap:0;background:#fff;border-bottom:2px solid #eee;overflow-x:auto}
+  .tab{padding:12px 18px;border:none;background:none;cursor:pointer;font-size:.9rem;font-weight:600;color:#888;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-2px}
+  .tab.active{color:#FF6B35;border-bottom-color:#FF6B35}
+  .panel{display:none;padding:16px 20px} .panel.active{display:block}
+  .card{background:#fff;border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 1px 6px rgba(0,0,0,.07)}
+  .card h2{font-size:1rem;margin-bottom:12px;color:#555}
+  .usage-big{font-size:2.2rem;font-weight:800;color:#FF6B35}
+  .usage-sub{color:#888;font-size:.85rem;margin-top:2px}
+  .progress-wrap{background:#eee;border-radius:20px;height:12px;margin-top:12px;overflow:hidden}
+  .progress-fill{height:100%;border-radius:20px;background:#FF6B35;transition:width .4s}
+  .week-chart{display:flex;align-items:flex-end;gap:8px;height:100px;margin-top:8px}
+  .wb{display:flex;flex-direction:column;align-items:center;flex:1;height:100%}
+  .wb-bar{background:#FF6B35;border-radius:4px 4px 0 0;width:100%;min-height:4px;margin-top:auto}
+  .wb-label{font-size:.7rem;color:#888;margin-top:4px}
+  .wb-val{font-size:.7rem;font-weight:700;color:#555}
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  td{padding:7px 6px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+  .h-time{color:#888;white-space:nowrap;width:44px}
+  .h-host{font-weight:700;color:#333;width:140px;word-break:break-all}
+  .h-title{color:#666}
+  .age-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px}
+  .age-card{border:2px solid #eee;border-radius:12px;padding:12px;text-align:center;cursor:pointer;transition:all .2s}
+  .age-card.selected{border-color:#FF6B35;background:#fff8f5}
+  .age-card .age-emoji{font-size:1.8rem}
+  .age-card .age-name{font-size:.8rem;font-weight:700;margin-top:4px;color:#333}
+  .age-card .age-sub{font-size:.7rem;color:#888}
+  .time-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .time-row label{font-size:.9rem;font-weight:600;color:#555}
+  .time-input{width:80px;border:2px solid #eee;border-radius:8px;padding:8px;font-size:1rem;text-align:center}
+  .save-btn{width:100%;padding:12px;border:none;border-radius:12px;background:#FF6B35;color:#fff;font-weight:800;font-size:1rem;cursor:pointer;margin-top:8px}
+  .save-btn:hover{background:#e55a25}
+  .msg{padding:8px 12px;border-radius:8px;font-size:.85rem;margin-top:8px;display:none}
+  .msg.ok{background:#e8f5e9;color:#2e7d32;display:block}
+  .msg.err{background:#ffebee;color:#c62828;display:block}
+</style>
+</head>
+<body>
+<header>
+  <span class="fox">🦊</span>
+  <h1>FoxiBrowser – Eltern-Bereich</h1>
+  <form method="POST" action="/logout" style="margin:0"><button type="submit" class="logout">Abmelden</button></form>
+</header>
+
+<div class="status-bar">
+  <div class="status-dot ${paused ? 'paused' : 'active'}"></div>
+  <span class="status-text">${paused ? '⏸ Surfen pausiert' : '▶ Kind surft gerade'}</span>
+  <form method="POST" action="/action" style="margin:0">
+    <input type="hidden" name="action" value="${paused ? 'resume' : 'pause'}">
+    <button type="submit" class="pause-btn ${paused ? 'do-resume' : 'do-pause'}">${paused ? '▶ Surfen freigeben' : '⏸ Pause'}</button>
+  </form>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('time',this)">⏰ Nutzungszeit</button>
+  <button class="tab" onclick="showTab('history',this)">📋 Verlauf</button>
+  <button class="tab" onclick="showTab('settings',this)">⚙️ Einstellungen</button>
+</div>
+
+<div id="tab-time" class="panel active">
+  <div class="card">
+    <h2>Heute</h2>
+    <div class="usage-big">${usedMin}m ${usedSec.toString().padStart(2,'0')}s</div>
+    <div class="usage-sub">${limitMin > 0 ? `von ${limitMin} Minuten erlaubt (${usedPct}%)` : 'kein Zeitlimit gesetzt'}</div>
+    ${limitMin > 0 ? `<div class="progress-wrap"><div class="progress-fill" style="width:${usedPct}%"></div></div>` : ''}
+  </div>
+  <div class="card">
+    <h2>Diese Woche</h2>
+    <div class="week-chart">${weekBars}</div>
+  </div>
+  <div class="card">
+    <h2>Tageslimit ändern</h2>
+    <form method="POST" action="/set-limit">
+      <div class="time-row">
+        <label>Minuten pro Tag (0 = kein Limit)</label>
+        <input type="number" class="time-input" name="limit" value="${limitMin}" min="0" max="720">
+      </div>
+      <button type="submit" class="save-btn">💾 Speichern</button>
+    </form>
+    <div id="limit-msg" class="msg"></div>
+  </div>
+</div>
+
+<div id="tab-history" class="panel">
+  <div class="card">
+    <h2>Besuchte Seiten (letzte 50)</h2>
+    ${historyRows ? `<table><tbody>${historyRows}</tbody></table>` : '<p style="color:#888;font-size:.9rem">Noch keine Seiten besucht.</p>'}
+  </div>
+</div>
+
+<div id="tab-settings" class="panel">
+  <div class="card">
+    <h2>Altersgruppe</h2>
+    <form method="POST" action="/set-age">
+      <div class="age-grid">
+        ${['klein','mittel','gross'].map(age => `
+        <label class="age-card ${currentAge === age ? 'selected' : ''}" onclick="selectAge('${age}')">
+          <input type="radio" name="age" value="${age}" ${currentAge === age ? 'checked' : ''} style="display:none">
+          <div class="age-emoji">${age==='klein'?'🧒':age==='mittel'?'👦':'👩‍💻'}</div>
+          <div class="age-name">${ageLabels[age]}</div>
+        </label>`).join('')}
+      </div>
+      <button type="submit" class="save-btn" style="margin-top:12px">💾 Altersgruppe speichern</button>
+    </form>
+  </div>
+</div>
+
 <script>
-document.getElementById('frm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const btn = e.submitter;
-  const action = btn ? btn.dataset.action : (document.body.dataset.paused === '1' ? 'resume' : 'pause');
-  const pin = document.getElementById('pin').value;
-  document.getElementById('err').textContent = '';
-  try {
-    const r = await fetch('/action', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({action, pin})
-    });
-    const d = await r.json();
-    if (d.ok) { location.reload(); }
-    else { document.getElementById('err').textContent = d.error || 'Fehler'; }
-  } catch(_) { document.getElementById('err').textContent = 'Verbindungsfehler'; }
-});
-// Seite alle 10s neu laden damit Status aktuell ist
-setTimeout(() => location.reload(), 10000);
+function showTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+function selectAge(age) {
+  document.querySelectorAll('.age-card').forEach(c => c.classList.remove('selected'));
+  document.querySelector('.age-card input[value="' + age + '"]').closest('.age-card').classList.add('selected');
+}
+// Auto-Refresh alle 15s
+setTimeout(() => location.reload(), 15000);
 </script>
 </body>
 </html>`;
 }
 
+// Einfache Session-Tokens (kein npm-Paket nötig)
+const remoteSessions = new Set();
+function makeToken() {
+  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+}
+function getSessionToken(req) {
+  const cookie = req.headers.cookie || '';
+  const m = cookie.match(/foxi_session=([a-z0-9]+)/);
+  return m ? m[1] : null;
+}
+function isAuthenticated(req) {
+  const token = getSessionToken(req);
+  return token && remoteSessions.has(token);
+}
+
+function readBody(req) {
+  return new Promise(resolve => {
+    let body = '';
+    req.on('data', c => { body += c; });
+    req.on('end', () => resolve(body));
+  });
+}
+function parseForm(body) {
+  const p = new URLSearchParams(body);
+  const out = {};
+  for (const [k,v] of p) out[k] = v;
+  return out;
+}
+
 async function startRemoteServer() {
   if (remoteServer) return;
   const store = await getStore();
+
   remoteServer = http.createServer(async (req, res) => {
-    if (req.method === 'GET' && req.url === '/') {
-      const html = remoteHtml();
+    const url = req.url.split('?')[0];
+
+    // ── Login ────────────────────────────────────────────────────
+    if (url === '/login' && req.method === 'POST') {
+      const form = parseForm(await readBody(req));
+      const settings = store.get('settings', { pin: '1234' });
+      if (form.pin === settings.pin) {
+        const token = makeToken();
+        remoteSessions.add(token);
+        res.writeHead(302, { 'Set-Cookie': `foxi_session=${token}; Path=/; HttpOnly`, Location: '/' });
+        res.end();
+      } else {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(remoteLoginHtml('Falsche PIN – bitte erneut versuchen.'));
+      }
+      return;
+    }
+
+    // ── Logout ───────────────────────────────────────────────────
+    if (url === '/logout' && req.method === 'POST') {
+      const token = getSessionToken(req);
+      if (token) remoteSessions.delete(token);
+      res.writeHead(302, { 'Set-Cookie': 'foxi_session=; Max-Age=0; Path=/', Location: '/' });
+      res.end();
+      return;
+    }
+
+    // ── Nicht eingeloggt → Login-Seite ───────────────────────────
+    if (!isAuthenticated(req)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(remoteLoginHtml());
+      return;
+    }
+
+    // ── Pause / Resume ───────────────────────────────────────────
+    if (url === '/action' && req.method === 'POST') {
+      const form = parseForm(await readBody(req));
+      if (form.action === 'pause') {
+        remotePaused = true;
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-pause');
+      } else if (form.action === 'resume') {
+        remotePaused = false;
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-resume');
+      }
+      res.writeHead(302, { Location: '/' });
+      res.end();
+      return;
+    }
+
+    // ── Zeitlimit setzen ─────────────────────────────────────────
+    if (url === '/set-limit' && req.method === 'POST') {
+      const form = parseForm(await readBody(req));
+      const limit = Math.max(0, Math.min(720, parseInt(form.limit, 10) || 0));
+      const settings = store.get('settings', { pin: '1234', timeLimitMinutes: 0 });
+      settings.timeLimitMinutes = limit;
+      store.set('settings', settings);
+      res.writeHead(302, { Location: '/' });
+      res.end();
+      return;
+    }
+
+    // ── Altersgruppe setzen ──────────────────────────────────────
+    if (url === '/set-age' && req.method === 'POST') {
+      const form = parseForm(await readBody(req));
+      const age = ['klein','mittel','gross'].includes(form.age) ? form.age : 'mittel';
+      const settings = store.get('settings', { pin: '1234', timeLimitMinutes: 0 });
+      settings.childAge = age;
+      store.set('settings', settings);
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-set-age', age);
+      res.writeHead(302, { Location: '/' });
+      res.end();
+      return;
+    }
+
+    // ── Hauptseite ───────────────────────────────────────────────
+    if (url === '/' && req.method === 'GET') {
+      const history   = store.get('history', []);
+      const usageData = store.get('usageData', {});
+      const settings  = store.get('settings', { pin: '1234', timeLimitMinutes: 0 });
+      const today     = new Date().toISOString().slice(0, 10);
+      const usageToday = getLiveUsedSeconds();
+      const usageWeek = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        usageWeek.push({ date: key, seconds: key === today ? getLiveUsedSeconds() : (usageData[key] || 0) });
+      }
+      const html = remoteMainHtml({ history, usageToday, usageWeek, settings, paused: remotePaused });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
       return;
     }
-    if (req.method === 'POST' && req.url === '/action') {
-      let body = '';
-      req.on('data', c => { body += c; });
-      req.on('end', async () => {
-        try {
-          const { action, pin } = JSON.parse(body);
-          const settings = store.get('settings', { pin: '1234' });
-          if (pin !== settings.pin) {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Falsche PIN' }));
-            return;
-          }
-          if (action === 'pause') {
-            remotePaused = true;
-            if (mainWindow && !mainWindow.isDestroyed())
-              mainWindow.webContents.send('remote-pause');
-          } else if (action === 'resume') {
-            remotePaused = false;
-            if (mainWindow && !mainWindow.isDestroyed())
-              mainWindow.webContents.send('remote-resume');
-          }
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true }));
-        } catch (_) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: 'Ungültige Anfrage' }));
-        }
-      });
-      return;
-    }
-    res.writeHead(404); res.end();
+
+    res.writeHead(404); res.end('Not found');
   });
+
   remoteServer.listen(REMOTE_PORT, '0.0.0.0', () => {
     console.log(`[FoxiBrowser] Remote-Server läuft auf Port ${REMOTE_PORT}`);
   });
 }
 
-function addFirewallRule() {
+function runElevatedNetsh(args) {
   return new Promise(resolve => {
-    // Firewall-Regel mit UAC-Elevation hinzufügen
-    const cmd = `powershell -Command "Start-Process netsh -Verb RunAs -Wait -ArgumentList 'advfirewall','firewall','add','rule','name=FoxiBrowser Fernzugriff','dir=in','action=allow','protocol=TCP','localport=${REMOTE_PORT}'"`;
+    // Temp-Skript schreiben und erhöht ausführen – zuverlässiger als inline args
+    const tmpScript = path.join(app.getPath('temp'), 'foxi_fw.ps1');
+    fs.writeFileSync(tmpScript, `netsh advfirewall firewall ${args}\r\n`, 'utf8');
+    const cmd = `powershell -ExecutionPolicy Bypass -Command "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-ExecutionPolicy Bypass -File \\"${tmpScript.replace(/\\/g, '\\\\')}\\""`;
     exec(cmd, err => {
-      if (err) console.warn('[FoxiBrowser] Firewall-Regel konnte nicht hinzugefügt werden:', err.message);
-      else console.log('[FoxiBrowser] Firewall-Regel hinzugefügt');
-      resolve();
+      try { fs.unlinkSync(tmpScript); } catch (_) {}
+      if (err) console.warn('[FoxiBrowser] Firewall-Fehler:', err.message);
+      else console.log('[FoxiBrowser] Firewall-Befehl ausgeführt:', args);
+      resolve(!err);
     });
   });
 }
 
+function addFirewallRule() {
+  return runElevatedNetsh(`add rule name="FoxiBrowser Fernzugriff" dir=in action=allow protocol=TCP localport=${REMOTE_PORT} enable=yes`);
+}
+
 function removeFirewallRule() {
-  const cmd = `powershell -Command "Start-Process netsh -Verb RunAs -Wait -ArgumentList 'advfirewall','firewall','delete','rule','name=FoxiBrowser Fernzugriff'"`;
-  exec(cmd, () => {});
+  runElevatedNetsh(`delete rule name="FoxiBrowser Fernzugriff"`);
 }
 
 function stopRemoteServer() {

@@ -1109,6 +1109,9 @@ window.foxiAPI.onRemoteResume(() => {
   timeLimitReached = false;
   showHome();
 });
+window.foxiAPI.onRemoteSetAge(age => {
+  applyAgeTheme(age);
+});
 
 // Remote-Tab öffnen → Status laden
 document.getElementById('parent-tabs').addEventListener('click', async e => {
