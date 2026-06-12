@@ -480,6 +480,9 @@ function remoteMainHtml(data) {
   .live-dot{width:8px;height:8px;border-radius:50%;background:#43a047;display:inline-block;margin-right:6px;animation:blink 1.5s infinite}
   @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
   .live-badge{font-size:.75rem;color:#43a047;font-weight:700}
+  .r-preset{background:#2a2a2a;color:#aaa;border:1px solid #333;border-radius:8px;padding:7px 14px;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}
+  .r-preset:hover{border-color:#FF6B35;color:#FF6B35}
+  .r-preset-active{background:#FF6B35!important;color:#fff!important;border-color:#FF6B35!important}
 </style>
 </head>
 <body>
@@ -526,13 +529,24 @@ function remoteMainHtml(data) {
     <div id="live-week-chart" class="week-chart">${weekBars}</div>
   </div>
   <div class="card">
-    <h2>Standard-Tageslimit</h2>
-    <form method="POST" action="/set-limit">
-      <div class="time-row">
-        <label>Minuten pro Tag (0 = kein Limit)</label>
-        <input type="number" class="time-input" name="limit" value="${settings.timeLimitMinutes || 0}" min="0" max="720">
+    <h2>Tages-Limit festlegen</h2>
+    <form method="POST" action="/set-limit" id="limit-form">
+      <div style="margin-bottom:10px">
+        <strong style="font-size:.9rem">Tages-Limit: </strong>
+        <span id="r-limit-display" style="color:#FF6B35;font-weight:800">${limitLabel(settings.timeLimitMinutes || 0)}</span>
       </div>
-      <button type="submit" class="save-btn">💾 Speichern</button>
+      <input type="range" id="r-limit-range" name="limit" min="0" max="240" step="15"
+        value="${Math.min(240, settings.timeLimitMinutes || 0)}"
+        style="width:100%;accent-color:#FF6B35;margin-bottom:14px;cursor:pointer">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        ${[0,30,60,90,120].map(m =>
+          `<button type="button" class="r-preset${(settings.timeLimitMinutes||0)===m?' r-preset-active':''}" data-mins="${m}">${m===0?'Kein Limit':m<60?m+' Min.':m===60?'1 Std.':m===90?'1,5 Std.':'2 Std.'}</button>`
+        ).join('')}
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button type="submit" class="save-btn" style="flex:1;min-width:120px">✓ Limit speichern</button>
+        <button type="button" id="r-btn-reset" class="save-btn" style="flex:1;min-width:120px;background:#e53935">↺ Heutigen Zähler zurücksetzen</button>
+      </div>
     </form>
   </div>
   <div class="card">
@@ -588,6 +602,48 @@ function showTab(id, btn) {
 function selectAge(age) {
   document.querySelectorAll('.age-card').forEach(c => c.classList.remove('selected'));
   document.querySelector('.age-card input[value="' + age + '"]').closest('.age-card').classList.add('selected');
+}
+
+// ── Tages-Limit Slider ────────────────────────────────────────────────────
+const rRange = document.getElementById('r-limit-range');
+const rDisplay = document.getElementById('r-limit-display');
+function limitLabelJS(m) {
+  if (m <= 0) return 'Kein Limit';
+  if (m < 60) return m + ' Min.';
+  if (m === 60) return '1 Std.';
+  if (m === 90) return '1,5 Std.';
+  return m % 60 === 0 ? (m/60) + ' Std.' : Math.floor(m/60) + 'h ' + (m%60) + 'm';
+}
+function syncPresets(val) {
+  document.querySelectorAll('.r-preset').forEach(b => {
+    b.classList.toggle('r-preset-active', parseInt(b.dataset.mins) === val);
+  });
+}
+if (rRange) {
+  rRange.addEventListener('input', () => {
+    const v = parseInt(rRange.value);
+    if (rDisplay) rDisplay.textContent = limitLabelJS(v);
+    syncPresets(v);
+  });
+  document.querySelectorAll('.r-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = parseInt(btn.dataset.mins);
+      rRange.value = Math.min(240, m);
+      if (rDisplay) rDisplay.textContent = limitLabelJS(m);
+      syncPresets(m);
+    });
+  });
+}
+
+// ── Heutigen Zähler zurücksetzen ─────────────────────────────────────────
+const rResetBtn = document.getElementById('r-btn-reset');
+if (rResetBtn) {
+  rResetBtn.addEventListener('click', async () => {
+    if (!confirm('Heutigen Nutzungszeit-Zähler wirklich auf 0 zurücksetzen?')) return;
+    const form = document.createElement('form');
+    form.method = 'POST'; form.action = '/reset-today';
+    document.body.appendChild(form); form.submit();
+  });
 }
 
 // ── Live-Polling alle 3 Sekunden ──────────────────────────────────────
@@ -755,6 +811,20 @@ async function startRemoteServer() {
       const settings = store.get('settings', { pin: '1234', timeLimitMinutes: 0 });
       settings.timeLimitMinutes = limit;
       store.set('settings', settings);
+      res.writeHead(302, { Location: '/' });
+      res.end();
+      return;
+    }
+
+    // ── Heutigen Zähler zurücksetzen ─────────────────────────────
+    if (url === '/reset-today' && req.method === 'POST') {
+      const data = store.get('usageData', {});
+      const today = new Date().toISOString().slice(0, 10);
+      delete data[today];
+      store.set('usageData', data);
+      _cachedUsedSeconds = 0;
+      usageStartTime = Date.now();
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-resume');
       res.writeHead(302, { Location: '/' });
       res.end();
       return;
