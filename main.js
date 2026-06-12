@@ -3,8 +3,9 @@
 const { app, BrowserWindow, ipcMain, session, screen, shell } = require('electron');
 const path = require('path');
 const fs   = require('fs');
-const http = require('http');
-const os   = require('os');
+const http  = require('http');
+const os    = require('os');
+const { exec } = require('child_process');
 
 // DNS-over-HTTPS: Cloudflare for Families
 if (app && app.commandLine) {
@@ -282,9 +283,12 @@ async function createWindow() {
   setTimeout(startAutoUpdater, 5000);
 
   // Remote-Server starten falls in Einstellungen aktiviert
-  getStore().then(s => {
+  getStore().then(async s => {
     const settings = s.get('settings', {});
-    if (settings.remoteEnabled) startRemoteServer();
+    if (settings.remoteEnabled) {
+      await addFirewallRule();
+      startRemoteServer();
+    }
   });
 }
 
@@ -458,6 +462,23 @@ async function startRemoteServer() {
   });
 }
 
+function addFirewallRule() {
+  return new Promise(resolve => {
+    // Firewall-Regel mit UAC-Elevation hinzufügen
+    const cmd = `powershell -Command "Start-Process netsh -Verb RunAs -Wait -ArgumentList 'advfirewall','firewall','add','rule','name=FoxiBrowser Fernzugriff','dir=in','action=allow','protocol=TCP','localport=${REMOTE_PORT}'"`;
+    exec(cmd, err => {
+      if (err) console.warn('[FoxiBrowser] Firewall-Regel konnte nicht hinzugefügt werden:', err.message);
+      else console.log('[FoxiBrowser] Firewall-Regel hinzugefügt');
+      resolve();
+    });
+  });
+}
+
+function removeFirewallRule() {
+  const cmd = `powershell -Command "Start-Process netsh -Verb RunAs -Wait -ArgumentList 'advfirewall','firewall','delete','rule','name=FoxiBrowser Fernzugriff'"`;
+  exec(cmd, () => {});
+}
+
 function stopRemoteServer() {
   if (!remoteServer) return;
   remoteServer.close();
@@ -618,8 +639,13 @@ ipcMain.handle('set-remote-enabled', async (_, enabled) => {
   const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
   settings.remoteEnabled = enabled;
   s.set('settings', settings);
-  if (enabled) await startRemoteServer();
-  else stopRemoteServer();
+  if (enabled) {
+    await addFirewallRule();  // UAC-Prompt erscheint hier
+    await startRemoteServer();
+  } else {
+    stopRemoteServer();
+    removeFirewallRule();
+  }
   return { ok: true, ip: getLocalIp(), port: REMOTE_PORT };
 });
 
