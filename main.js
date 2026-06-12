@@ -387,11 +387,15 @@ function remoteLoginHtml(error) {
 }
 
 function remoteMainHtml(data) {
-  const { history, usageToday, usageWeek, settings, paused, childUrl, childTitle } = data;
-  const usedMin = Math.floor(usageToday / 60);
-  const usedSec = usageToday % 60;
-  const limitMin = settings.timeLimitMinutes || 0;
+  const { history, usageToday, usageWeek, settings, todayLimit, paused, childUrl, childTitle } = data;
+  const usedMin  = Math.floor(usageToday / 60);
+  const usedSec  = usageToday % 60;
+  const limitMin = todayLimit !== undefined ? todayLimit : (settings.timeLimitMinutes || 0);
   const usedPct  = limitMin > 0 ? Math.min(100, Math.round(usageToday / (limitMin * 60) * 100)) : 0;
+  const weekLimits = settings.weekdayLimits || {};
+  const dayNames = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+  const limitOptions = [0,30,60,90,120,180,240,300,360,480,600,720];
+  const limitLabel = m => m <= 0 ? 'Kein Limit' : m < 60 ? `${m} Min.` : m % 60 === 0 ? `${m/60} Std.` : `${Math.floor(m/60)}h ${m%60}m`;
 
   const historyRows = history.slice(0, 50).map(h => {
     const d = new Date(h.time);
@@ -466,6 +470,16 @@ function remoteMainHtml(data) {
   .msg{padding:8px 12px;border-radius:8px;font-size:.85rem;margin-top:8px;display:none}
   .msg.ok{background:#e8f5e9;color:#2e7d32;display:block}
   .msg.err{background:#ffebee;color:#c62828;display:block}
+  .week-table{width:100%;border-collapse:collapse;font-size:.9rem}
+  .week-table tr{border-bottom:1px solid #f0f0f0}
+  .week-table td{padding:8px 6px;vertical-align:middle}
+  .week-table td:first-child{font-weight:700;color:#444;width:110px}
+  .week-table .today-row td:first-child{color:#FF6B35}
+  .week-table select{border:2px solid #eee;border-radius:8px;padding:6px 8px;font-size:.85rem;background:#fff;width:130px}
+  .week-table select:focus{border-color:#FF6B35;outline:none}
+  .live-dot{width:8px;height:8px;border-radius:50%;background:#43a047;display:inline-block;margin-right:6px;animation:blink 1.5s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  .live-badge{font-size:.75rem;color:#43a047;font-weight:700}
 </style>
 </head>
 <body>
@@ -502,25 +516,41 @@ function remoteMainHtml(data) {
 
 <div id="tab-time" class="panel active">
   <div class="card">
-    <h2>Heute</h2>
-    <div class="usage-big">${usedMin}m ${usedSec.toString().padStart(2,'0')}s</div>
-    <div class="usage-sub">${limitMin > 0 ? `von ${limitMin} Minuten erlaubt (${usedPct}%)` : 'kein Zeitlimit gesetzt'}</div>
-    ${limitMin > 0 ? `<div class="progress-wrap"><div class="progress-fill" style="width:${usedPct}%"></div></div>` : ''}
+    <h2>Heute <span class="live-badge"><span class="live-dot"></span>Live</span></h2>
+    <div id="live-usage-big" class="usage-big">${usedMin}m ${usedSec.toString().padStart(2,'0')}s</div>
+    <div id="live-usage-sub" class="usage-sub">${limitMin > 0 ? `von ${limitMin} Minuten erlaubt (${usedPct}%)` : 'kein Zeitlimit gesetzt'}</div>
+    <div class="progress-wrap"><div id="live-progress" class="progress-fill" style="width:${usedPct}%"></div></div>
   </div>
   <div class="card">
     <h2>Diese Woche</h2>
-    <div class="week-chart">${weekBars}</div>
+    <div id="live-week-chart" class="week-chart">${weekBars}</div>
   </div>
   <div class="card">
-    <h2>Tageslimit ändern</h2>
+    <h2>Standard-Tageslimit</h2>
     <form method="POST" action="/set-limit">
       <div class="time-row">
         <label>Minuten pro Tag (0 = kein Limit)</label>
-        <input type="number" class="time-input" name="limit" value="${limitMin}" min="0" max="720">
+        <input type="number" class="time-input" name="limit" value="${settings.timeLimitMinutes || 0}" min="0" max="720">
       </div>
       <button type="submit" class="save-btn">💾 Speichern</button>
     </form>
-    <div id="limit-msg" class="msg"></div>
+  </div>
+  <div class="card">
+    <h2>Wochentag-Limits</h2>
+    <p style="font-size:.8rem;color:#888;margin-bottom:12px">Unterschiedliche Limits für Schultage und Wochenende. Leer lassen = Standard-Tageslimit.</p>
+    <form method="POST" action="/set-week-limits">
+      <table class="week-table">
+        ${[1,2,3,4,5,6,0].map(d => {
+          const isToday = new Date().getDay() === d;
+          const val = weekLimits[d] !== undefined ? weekLimits[d] : -1;
+          const opts = [-1,...limitOptions].map(m =>
+            `<option value="${m}" ${val === m ? 'selected' : ''}>${m < 0 ? '(Standard)' : limitLabel(m)}</option>`
+          ).join('');
+          return `<tr class="${isToday ? 'today-row' : ''}"><td>${dayNames[d]}${isToday ? ' ◀' : ''}</td><td><select name="day${d}">${opts}</select></td></tr>`;
+        }).join('')}
+      </table>
+      <button type="submit" class="save-btn" style="margin-top:12px">💾 Wochentag-Limits speichern</button>
+    </form>
   </div>
 </div>
 
@@ -559,8 +589,77 @@ function selectAge(age) {
   document.querySelectorAll('.age-card').forEach(c => c.classList.remove('selected'));
   document.querySelector('.age-card input[value="' + age + '"]').closest('.age-card').classList.add('selected');
 }
-// Auto-Refresh alle 15s
-setTimeout(() => location.reload(), 15000);
+
+// ── Live-Polling alle 3 Sekunden ──────────────────────────────────────
+function fmtTime(secs) {
+  const m = Math.floor(secs / 60), s = secs % 60;
+  return m + 'm ' + String(s).padStart(2,'0') + 's';
+}
+function fmtLimitLabel(m) {
+  if (m <= 0) return 'kein Zeitlimit';
+  if (m < 60) return m + ' Min.';
+  return m % 60 === 0 ? (m/60) + ' Std.' : Math.floor(m/60) + 'h ' + (m%60) + 'm';
+}
+function buildWeekBars(usageWeek, limitMin) {
+  return usageWeek.map(d => {
+    const mins = Math.floor(d.seconds / 60);
+    const pct  = limitMin > 0 ? Math.min(100, Math.round(d.seconds / (limitMin * 60) * 100)) : Math.min(100, Math.round(mins / 60 * 100));
+    const day  = new Date(d.date + 'T12:00:00').toLocaleDateString('de-DE', {weekday:'short'});
+    return '<div class="wb"><div class="wb-bar" style="height:'+pct+'%"></div><div class="wb-label">'+day+'</div><div class="wb-val">'+mins+'m</div></div>';
+  }).join('');
+}
+function updateStatusBar(d) {
+  const dot  = document.querySelector('.status-dot');
+  const txt  = document.querySelector('.status-text');
+  const page = document.querySelector('.current-page');
+  const btn  = document.querySelector('.pause-btn');
+  const inp  = document.querySelector('input[name="action"]');
+  if (!dot) return;
+  if (d.paused) {
+    dot.className = 'status-dot paused';
+    txt.textContent = '⏸ Pausiert';
+    if (page) { page.className = 'current-page home'; page.innerHTML = 'Surfen ist pausiert'; }
+    if (btn) { btn.className = 'pause-btn do-resume'; btn.textContent = '▶ Freigeben'; }
+    if (inp) inp.value = 'resume';
+  } else {
+    dot.className = 'status-dot active';
+    txt.textContent = '▶ Aktiv';
+    if (btn) { btn.className = 'pause-btn do-pause'; btn.textContent = '⏸ Pause'; }
+    if (inp) inp.value = 'pause';
+    if (page) {
+      if (!d.childUrl || d.childUrl === 'about:blank' || d.childUrl === '') {
+        page.className = 'current-page home'; page.innerHTML = '🏠 Startseite';
+      } else {
+        let host = d.childUrl;
+        try { host = new URL(d.childUrl).hostname.replace(/^www\./,''); } catch(_) {}
+        const title = (d.childTitle || host).substring(0, 60);
+        page.className = 'current-page';
+        page.innerHTML = '🌐 <a href="' + d.childUrl.replace(/"/g,'') + '" target="_blank">' + title + '</a><br><small style="color:#aaa">' + host + '</small>';
+      }
+    }
+  }
+}
+async function poll() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    // Status-Bar aktualisieren
+    updateStatusBar(d);
+    // Nutzungszeit aktualisieren
+    const big = document.getElementById('live-usage-big');
+    const sub = document.getElementById('live-usage-sub');
+    const bar = document.getElementById('live-progress');
+    const chart = document.getElementById('live-week-chart');
+    if (big) big.textContent = fmtTime(d.usageToday);
+    if (sub) {
+      const pct = d.limitMinutes > 0 ? Math.min(100, Math.round(d.usageToday / (d.limitMinutes * 60) * 100)) : 0;
+      sub.textContent = d.limitMinutes > 0 ? 'von ' + fmtLimitLabel(d.limitMinutes) + ' erlaubt (' + pct + '%)' : 'kein Zeitlimit gesetzt';
+      if (bar) bar.style.width = pct + '%';
+    }
+    if (chart && d.usageWeek) chart.innerHTML = buildWeekBars(d.usageWeek, d.limitMinutes);
+  } catch(_) {}
+}
+setInterval(poll, 3000);
 </script>
 </body>
 </html>`;
@@ -674,12 +773,14 @@ async function startRemoteServer() {
       return;
     }
 
-    // ── Hauptseite ───────────────────────────────────────────────
-    if (url === '/' && req.method === 'GET') {
-      const history   = store.get('history', []);
+    // ── Live-Status JSON (für Auto-Polling) ─────────────────────
+    if (url === '/api/status' && req.method === 'GET') {
       const usageData = store.get('usageData', {});
       const settings  = store.get('settings', { pin: '1234', timeLimitMinutes: 0 });
       const today     = new Date().toISOString().slice(0, 10);
+      const todayDow  = new Date().getDay();
+      const weekLimits = settings.weekdayLimits || {};
+      const todayLimit = weekLimits[todayDow] !== undefined ? weekLimits[todayDow] : (settings.timeLimitMinutes || 0);
       const usageToday = getLiveUsedSeconds();
       const usageWeek = [];
       for (let i = 6; i >= 0; i--) {
@@ -687,7 +788,54 @@ async function startRemoteServer() {
         const key = d.toISOString().slice(0, 10);
         usageWeek.push({ date: key, seconds: key === today ? getLiveUsedSeconds() : (usageData[key] || 0) });
       }
-      const html = remoteMainHtml({ history, usageToday, usageWeek, settings, paused: remotePaused, childUrl: currentChildUrl, childTitle: currentChildTitle });
+      const payload = {
+        paused: remotePaused,
+        childUrl: currentChildUrl,
+        childTitle: currentChildTitle,
+        usageToday,
+        limitMinutes: todayLimit,
+        usageWeek,
+        weekdayLimits: settings.weekdayLimits || {},
+        globalLimit: settings.timeLimitMinutes || 0,
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(payload));
+      return;
+    }
+
+    // ── Wochentag-Limits speichern ───────────────────────────────
+    if (url === '/set-week-limits' && req.method === 'POST') {
+      const form = parseForm(await readBody(req));
+      const settings = store.get('settings', { pin: '1234', timeLimitMinutes: 0 });
+      const weekLimits = {};
+      for (let d = 0; d <= 6; d++) {
+        const val = parseInt(form[`day${d}`], 10);
+        weekLimits[d] = isNaN(val) ? -1 : Math.max(0, Math.min(720, val));
+      }
+      settings.weekdayLimits = weekLimits;
+      store.set('settings', settings);
+      res.writeHead(302, { Location: '/' });
+      res.end();
+      return;
+    }
+
+    // ── Hauptseite ───────────────────────────────────────────────
+    if (url === '/' && req.method === 'GET') {
+      const history   = store.get('history', []);
+      const usageData = store.get('usageData', {});
+      const settings  = store.get('settings', { pin: '1234', timeLimitMinutes: 0 });
+      const today     = new Date().toISOString().slice(0, 10);
+      const todayDow  = new Date().getDay();
+      const weekLimits = settings.weekdayLimits || {};
+      const todayLimit = weekLimits[todayDow] !== undefined ? weekLimits[todayDow] : (settings.timeLimitMinutes || 0);
+      const usageToday = getLiveUsedSeconds();
+      const usageWeek = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        usageWeek.push({ date: key, seconds: key === today ? getLiveUsedSeconds() : (usageData[key] || 0) });
+      }
+      const html = remoteMainHtml({ history, usageToday, usageWeek, settings, todayLimit, paused: remotePaused, childUrl: currentChildUrl, childTitle: currentChildTitle });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
       return;
