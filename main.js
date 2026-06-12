@@ -867,13 +867,14 @@ async function sendMsg() {
   const text = inp.value.trim();
   if (!text) return;
   inp.value = '';
-  // Direkt lokal anzeigen, dann senden
-  const now = Date.now();
-  chatSeen.add(now);
-  appendChatMsg({ from: 'parent', text, time: now });
-  await fetch('/send-message', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'text=' + encodeURIComponent(text) });
-  // chatLastTime auf den gerade gesendeten Zeitpunkt setzen damit Polling ihn nicht nochmal holt
-  if (now > chatLastTime) chatLastTime = now;
+  const r = await fetch('/send-message', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'text=' + encodeURIComponent(text) });
+  const data = await r.json();
+  // Server-Zeitstempel benutzen damit Dedup-Set und chatLastTime exakt stimmen
+  if (data.msg) {
+    chatSeen.add(data.msg.time);
+    appendChatMsg(data.msg);
+    if (data.msg.time > chatLastTime) chatLastTime = data.msg.time;
+  }
 }
 async function clearChat() {
   if (!confirm('Chat wirklich löschen?')) return;
@@ -1102,14 +1103,16 @@ async function startRemoteServer() {
       if (!isAuthenticated(req)) { res.writeHead(302, { Location: '/login' }); res.end(); return; }
       const form = parseForm(await readBody(req));
       const text = (form.text || '').trim().substring(0, 500);
+      let savedMsg = null;
       if (text) {
-        const msg = { from: 'parent', text, time: Date.now() };
-        chatMessages.push(msg);
+        savedMsg = { from: 'parent', text, time: Date.now() };
+        chatMessages.push(savedMsg);
         if (chatMessages.length > 100) chatMessages = chatMessages.slice(-100);
-        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('chat-message', msg);
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('chat-message', savedMsg);
       }
+      // Server-Zeitstempel zurückgeben damit Client chatLastTime korrekt setzen kann
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true }));
+      res.end(JSON.stringify({ ok: true, msg: savedMsg }));
       return;
     }
 

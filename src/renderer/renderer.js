@@ -1120,7 +1120,7 @@ window.foxiAPI.onRemoteSetAge(age => {
 (function initChat() {
   const overlay = document.createElement('div');
   overlay.id = 'chat-overlay';
-  overlay.style.cssText = 'display:none;position:fixed;bottom:90px;right:24px;width:320px;max-width:calc(100vw - 48px);z-index:9999;font-family:Nunito,sans-serif';
+  overlay.style.cssText = 'display:none;position:fixed;bottom:90px;right:24px;width:320px;height:380px;max-width:calc(100vw - 48px);z-index:9999;font-family:Nunito,sans-serif';
 
   const msgBox  = document.createElement('div');
   const input   = document.createElement('input');
@@ -1128,7 +1128,7 @@ window.foxiAPI.onRemoteSetAge(age => {
 
   // Nachrichten-Container
   msgBox.id = 'chat-overlay-msgs';
-  msgBox.style.cssText = 'max-height:220px;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px';
+  msgBox.style.cssText = 'flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px';
 
   // Eingabe
   input.id = 'chat-overlay-input';
@@ -1161,7 +1161,7 @@ window.foxiAPI.onRemoteSetAge(age => {
   footer.appendChild(sendBtn);
 
   const card = document.createElement('div');
-  card.style.cssText = 'background:#1e1e1e;border:2px solid #FF6B35;border-radius:18px;box-shadow:0 8px 32px rgba(0,0,0,.6);overflow:hidden';
+  card.style.cssText = 'background:#1e1e1e;border:2px solid #FF6B35;border-radius:18px;box-shadow:0 8px 32px rgba(0,0,0,.6);overflow:hidden;display:flex;flex-direction:column;height:100%';
   card.appendChild(header);
   card.appendChild(msgBox);
   card.appendChild(footer);
