@@ -18,6 +18,8 @@ files:
   - src/blocklists/**/*
   - src/assets/icon.png
   - src/assets/icon.ico
+  - src/assets/logo1.png
+  - src/assets/logo2.png
   - "!src/assets/*.bmp"
   - "!**/*.map"
   - "!node_modules/.cache/**"
