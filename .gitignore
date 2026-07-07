@@ -10,4 +10,6 @@ Thumbs.db
 
 # Enthalten Server-/SMTP-Zugangsdaten – niemals ins (öffentliche) Repo!
 scripts/deploy-website.js
-website/reset.php
+
+# Landingpage gehört nicht ins Code-Repo (liegt auf dem Server; reset.php enthält SMTP-Daten)
+website/
