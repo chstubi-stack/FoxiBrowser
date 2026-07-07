@@ -13,3 +13,6 @@ scripts/deploy-website.js
 
 # Landingpage gehört nicht ins Code-Repo (liegt auf dem Server; reset.php enthält SMTP-Daten)
 website/
+
+# Projekt-Doku bewusst nur lokal, nicht im (öffentlichen) Repo
+CLAUDE.md
