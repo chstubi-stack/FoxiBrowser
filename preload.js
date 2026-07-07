@@ -15,6 +15,15 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   getSettings:    ()        => ipcRenderer.invoke('get-settings'),
   setSettings:    (s)       => ipcRenderer.invoke('set-settings', s),
   verifyPin:      (pin)     => ipcRenderer.invoke('verify-pin', pin),
+  // Standard-Browser
+  getDefaultBrowserStatus: () => ipcRenderer.invoke('get-default-browser-status'),
+  setDefaultBrowser:       () => ipcRenderer.invoke('set-default-browser'),
+  // PIN-Wiederherstellung
+  getRecoverySetup:   ()        => ipcRenderer.invoke('get-recovery-setup'),
+  saveRecoverySetup:  (data)    => ipcRenderer.invoke('save-recovery-setup', data),
+  resetPinViaAnswer:  (data)    => ipcRenderer.invoke('reset-pin-via-answer', data),
+  sendResetCode:      ()        => ipcRenderer.invoke('send-reset-code'),
+  resetPinViaCode:    (data)    => ipcRenderer.invoke('reset-pin-via-code', data),
   // Verlauf
   addHistory:           (entry)  => ipcRenderer.invoke('add-history', entry),
   updateHistoryDuration:(data)   => ipcRenderer.invoke('update-history-duration', data),

@@ -467,6 +467,34 @@ document.getElementById('parent-close').addEventListener('click', () => {
   parentPanel.classList.add('hidden');
 });
 
+// Bug-Screenshot (optional) – als Data-URL im Speicher halten
+let bugImageDataUrl = null;
+const bugImageInput = document.getElementById('bug-image');
+if (bugImageInput) {
+  bugImageInput.addEventListener('change', () => {
+    const file = bugImageInput.files && bugImageInput.files[0];
+    const msg  = document.getElementById('bug-msg');
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      bugImageInput.value = '';
+      msg.textContent = '⚠️ Bild ist zu groß (max. 5 MB).'; msg.className = 'error'; msg.classList.remove('hidden');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      bugImageDataUrl = reader.result;
+      document.getElementById('bug-image-thumb').src = bugImageDataUrl;
+      document.getElementById('bug-image-preview').classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('bug-image-remove').addEventListener('click', () => {
+    bugImageDataUrl = null;
+    bugImageInput.value = '';
+    document.getElementById('bug-image-preview').classList.add('hidden');
+  });
+}
+
 document.getElementById('btn-send-bug').addEventListener('click', async () => {
   const title = document.getElementById('bug-title').value.trim();
   const body  = document.getElementById('bug-body').value.trim();
@@ -474,13 +502,16 @@ document.getElementById('btn-send-bug').addEventListener('click', async () => {
   if (!title) { msg.textContent = '⚠️ Bitte einen Titel eingeben.'; msg.className = 'error'; msg.classList.remove('hidden'); return; }
   const btn = document.getElementById('btn-send-bug');
   btn.disabled = true; btn.textContent = '⏳ Wird gesendet…';
-  const result = await window.foxiAPI.createBugReport({ title, body });
+  const result = await window.foxiAPI.createBugReport({ title, body, image: bugImageDataUrl });
   btn.disabled = false; btn.textContent = '📤 Bericht absenden';
   if (result.ok) {
     msg.textContent = `✅ Bug #${result.number} wurde erfolgreich gemeldet!`;
     msg.className = 'success'; msg.classList.remove('hidden');
     document.getElementById('bug-title').value = '';
     document.getElementById('bug-body').value  = '';
+    bugImageDataUrl = null;
+    if (bugImageInput) bugImageInput.value = '';
+    document.getElementById('bug-image-preview').classList.add('hidden');
   } else {
     msg.textContent = `❌ Fehler: ${result.error}`;
     msg.className = 'error'; msg.classList.remove('hidden');
@@ -504,7 +535,32 @@ document.getElementById('parent-tabs').addEventListener('click', async e => {
   if (btn.dataset.tab === 'time')      await loadParentTime();
   if (btn.dataset.tab === 'favorites') loadParentFavorites();
   if (btn.dataset.tab === 'profile')   await loadParentProfile();
+  if (btn.dataset.tab === 'system')    await loadDefaultBrowserStatus();
+  if (btn.dataset.tab === 'pin')       await loadRecoverySetup();
 });
+
+// ── Tab: System (Standard-Browser) ────────────────────────────────────────
+async function loadDefaultBrowserStatus() {
+  const el = document.getElementById('default-browser-status');
+  if (!el) return;
+  try {
+    const isDefault = await window.foxiAPI.getDefaultBrowserStatus();
+    el.textContent = isDefault ? '✅ FoxiBrowser ist als http/https-Handler registriert.'
+                               : 'ℹ️ FoxiBrowser ist noch nicht als Standard-Browser gesetzt.';
+    el.style.color = isDefault ? '#2e7d32' : '';
+  } catch (_) { el.textContent = ''; }
+}
+
+const btnSetDefaultBrowser = document.getElementById('btn-set-default-browser');
+if (btnSetDefaultBrowser) {
+  btnSetDefaultBrowser.addEventListener('click', async () => {
+    btnSetDefaultBrowser.disabled = true;
+    await window.foxiAPI.setDefaultBrowser();
+    btnSetDefaultBrowser.disabled = false;
+    const el = document.getElementById('default-browser-status');
+    if (el) { el.textContent = '➡️ Windows-Einstellungen geöffnet – bitte FoxiBrowser unter „Webbrowser" auswählen.'; el.style.color = '#e55a25'; }
+  });
+}
 
 // ── Tab: Verlauf ──────────────────────────────────────────────────────────
 
@@ -609,7 +665,7 @@ function renderHistory(history) {
     const row = document.createElement('div');
     row.className = 'history-entry';
     row.innerHTML = `
-      <img class="h-favicon" src="https://www.google.com/s2/favicons?domain=${host}&sz=20" alt="">
+      <img class="h-favicon" src="https://www.google.com/s2/favicons?domain=${host}&sz=20" alt="" onerror="this.style.visibility='hidden'">
       <div class="h-info">
         <div class="h-title">${escHtml(entry.title || entry.url)}</div>
         <div class="h-url">${escHtml(entry.url)}</div>
@@ -870,6 +926,145 @@ document.getElementById('btn-save-pin').addEventListener('click', async () => {
   document.getElementById('pin-new').value     = '';
   document.getElementById('pin-confirm').value = '';
   showMsg('✓ PIN erfolgreich geändert!', 'success');
+});
+
+// ── PIN-Wiederherstellung: Einrichtung (im PIN-Tab) ───────────────────────
+let recoveryState = { hasQuestion: false, question: '', hasEmail: false, emailMasked: '' };
+
+async function loadRecoverySetup() {
+  try {
+    recoveryState = await window.foxiAPI.getRecoverySetup();
+  } catch (_) { return; }
+  const q = document.getElementById('rec-question');
+  const e = document.getElementById('rec-email');
+  if (q) q.value = recoveryState.question || '';
+  if (e) e.value = ''; // Aus Datenschutz nicht die volle Mail vorbefüllen
+  const emailField = document.getElementById('rec-email');
+  if (emailField && recoveryState.hasEmail) emailField.placeholder = recoveryState.emailMasked + ' (hinterlegt)';
+}
+
+const btnSaveRecovery = document.getElementById('btn-save-recovery');
+if (btnSaveRecovery) {
+  btnSaveRecovery.addEventListener('click', async () => {
+    const question = document.getElementById('rec-question').value.trim();
+    const answer   = document.getElementById('rec-answer').value.trim();
+    const email    = document.getElementById('rec-email').value.trim();
+    const msg      = document.getElementById('rec-msg');
+    const show = (t, ok) => { msg.textContent = t; msg.className = ok ? 'success' : 'error'; msg.classList.remove('hidden'); };
+
+    // Nur senden was gefüllt ist; leere E-Mail nur senden, wenn Feld bewusst benutzt wurde
+    const payload = {};
+    if (question || answer) { payload.question = question; payload.answer = answer; }
+    if (email) payload.email = email;
+    if (!Object.keys(payload).length) { show('Bitte Frage/Antwort oder E-Mail eingeben.', false); return; }
+
+    const res = await window.foxiAPI.saveRecoverySetup(payload);
+    if (res.ok) {
+      show('✓ Wiederherstellung gespeichert!', true);
+      document.getElementById('rec-answer').value = '';
+      await loadRecoverySetup();
+    } else {
+      show('❌ ' + (res.error || 'Fehler'), false);
+    }
+  });
+}
+
+// ── PIN vergessen: Reset-Overlay ──────────────────────────────────────────
+const forgotOverlay = document.getElementById('forgot-overlay');
+
+function forgotShowMsg(text, ok) {
+  const m = document.getElementById('forgot-msg');
+  m.textContent = text; m.className = ok ? 'ok' : 'err'; m.classList.remove('hidden');
+}
+function forgotResetView() {
+  document.getElementById('forgot-msg').classList.add('hidden');
+  document.getElementById('forgot-question-form').classList.add('hidden');
+  document.getElementById('forgot-email-form').classList.add('hidden');
+  document.getElementById('forgot-code-fields').classList.add('hidden');
+  document.getElementById('forgot-methods').classList.remove('hidden');
+  document.getElementById('forgot-back').classList.add('hidden');
+  document.getElementById('forgot-intro').classList.remove('hidden');
+  ['forgot-answer','forgot-newpin-q','forgot-newpin-q2','forgot-code','forgot-newpin-e','forgot-newpin-e2']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+}
+
+async function openForgotOverlay() {
+  forgotResetView();
+  let setup = { hasQuestion: false, hasEmail: false, question: '', emailMasked: '' };
+  try { setup = await window.foxiAPI.getRecoverySetup(); } catch (_) {}
+  const mQ = document.getElementById('forgot-m-question');
+  const mE = document.getElementById('forgot-m-email');
+  mQ.disabled = !setup.hasQuestion;
+  mE.disabled = !setup.hasEmail;
+  mQ.style.opacity = setup.hasQuestion ? '1' : '.45';
+  mE.style.opacity = setup.hasEmail ? '1' : '.45';
+  document.getElementById('forgot-question-text').textContent = setup.question || '';
+  document.getElementById('forgot-email-info').textContent = setup.hasEmail
+    ? `Wir senden einen Code an ${setup.emailMasked}.`
+    : 'Keine E-Mail hinterlegt.';
+  if (!setup.hasQuestion && !setup.hasEmail) {
+    forgotShowMsg('Es wurde noch keine Wiederherstellung eingerichtet. Standard-PIN ist 1234.', false);
+  }
+  forgotOverlay.classList.remove('hidden');
+}
+function closeForgotOverlay() { forgotOverlay.classList.add('hidden'); }
+
+document.getElementById('pin-forgot-link').addEventListener('click', () => {
+  closePinDialog();
+  openForgotOverlay();
+});
+document.getElementById('forgot-close').addEventListener('click', closeForgotOverlay);
+document.getElementById('forgot-back').addEventListener('click', forgotResetView);
+
+function forgotSwitchTo(which) {
+  document.getElementById('forgot-methods').classList.add('hidden');
+  document.getElementById('forgot-intro').classList.add('hidden');
+  document.getElementById('forgot-msg').classList.add('hidden');
+  document.getElementById('forgot-back').classList.remove('hidden');
+  document.getElementById('forgot-question-form').classList.toggle('hidden', which !== 'question');
+  document.getElementById('forgot-email-form').classList.toggle('hidden', which !== 'email');
+}
+document.getElementById('forgot-m-question').addEventListener('click', () => forgotSwitchTo('question'));
+document.getElementById('forgot-m-email').addEventListener('click', () => forgotSwitchTo('email'));
+
+// Weg 1: Sicherheitsfrage → neue PIN
+document.getElementById('forgot-submit-q').addEventListener('click', async () => {
+  const answer = document.getElementById('forgot-answer').value.trim();
+  const p1 = document.getElementById('forgot-newpin-q').value;
+  const p2 = document.getElementById('forgot-newpin-q2').value;
+  if (!answer) return forgotShowMsg('Bitte die Antwort eingeben.', false);
+  if (!/^\d{4}$/.test(p1)) return forgotShowMsg('Neue PIN muss genau 4 Ziffern haben.', false);
+  if (p1 !== p2) return forgotShowMsg('Die neuen PINs stimmen nicht überein.', false);
+  const res = await window.foxiAPI.resetPinViaAnswer({ answer, newPin: p1 });
+  if (res.ok) {
+    forgotShowMsg('✓ Neue PIN gesetzt! Du kannst dich jetzt anmelden.', true);
+    setTimeout(closeForgotOverlay, 1800);
+  } else forgotShowMsg('❌ ' + (res.error || 'Fehler'), false);
+});
+
+// Weg 2: E-Mail-Code
+document.getElementById('forgot-send-code').addEventListener('click', async () => {
+  const btn = document.getElementById('forgot-send-code');
+  btn.disabled = true; btn.textContent = '⏳ Sende…';
+  const res = await window.foxiAPI.sendResetCode();
+  btn.disabled = false; btn.textContent = '✉️ Code senden';
+  if (res.ok) {
+    document.getElementById('forgot-code-fields').classList.remove('hidden');
+    forgotShowMsg(`✓ Code an ${res.emailMasked} gesendet. Bitte Postfach prüfen.`, true);
+  } else forgotShowMsg('❌ ' + (res.error || 'Fehler'), false);
+});
+document.getElementById('forgot-submit-e').addEventListener('click', async () => {
+  const code = document.getElementById('forgot-code').value.trim();
+  const p1 = document.getElementById('forgot-newpin-e').value;
+  const p2 = document.getElementById('forgot-newpin-e2').value;
+  if (!code) return forgotShowMsg('Bitte den Code aus der E-Mail eingeben.', false);
+  if (!/^\d{4}$/.test(p1)) return forgotShowMsg('Neue PIN muss genau 4 Ziffern haben.', false);
+  if (p1 !== p2) return forgotShowMsg('Die neuen PINs stimmen nicht überein.', false);
+  const res = await window.foxiAPI.resetPinViaCode({ code, newPin: p1 });
+  if (res.ok) {
+    forgotShowMsg('✓ Neue PIN gesetzt! Du kannst dich jetzt anmelden.', true);
+    setTimeout(closeForgotOverlay, 1800);
+  } else forgotShowMsg('❌ ' + (res.error || 'Fehler'), false);
 });
 
 // ── Tab: Kind-Profil ──────────────────────────────────────────────────────

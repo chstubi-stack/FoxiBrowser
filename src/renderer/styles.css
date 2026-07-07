@@ -57,7 +57,7 @@ body[data-age="mittel"] {
   --theme-accent2: #FF8C42;
 }
 
-/* GroÃŸ 11-14: Indigo/Blau, ruhiger */
+/* GroÃŸ 11-14: Indigo/Blau, ruhiger â€“ gleiches Karten-Layout wie die anderen Profile */
 body[data-age="gross"] {
   --foxi-orange:  #3F51B5;
   --foxi-orange2: #5C6BC0;
@@ -67,10 +67,10 @@ body[data-age="gross"] {
   --theme-accent2: #5C6BC0;
   --theme-bg:      #F0F4FF;
   --theme-text:    #1A237E;
-  --theme-fav-size:118px;
-  --theme-fav-font:13px;
-  --theme-fav-emoji:36px;
-  --theme-home-h1: 1.7rem;
+  --theme-fav-size:150px;
+  --theme-fav-font:15px;
+  --theme-fav-emoji:46px;
+  --theme-home-h1: 1.9rem;
 }
 body[data-age="gross"] #titlebar,
 body[data-age="gross"] #navbar {
@@ -322,6 +322,59 @@ html, body {
   60%{transform:translateX(-8px)}
   80%{transform:translateX(8px)}
 }
+
+/* ── PIN vergessen: Link im PIN-Overlay ──────────────────────────── */
+#pin-forgot-link {
+  margin-top: 16px; background: none; border: none;
+  color: var(--foxi-orange); font-size: 14px; font-weight: 700;
+  cursor: pointer; text-decoration: underline; font-family: inherit;
+}
+#pin-forgot-link:hover { opacity: .8; }
+
+/* ── PIN-Zurücksetzen-Overlay ────────────────────────────────────── */
+#forgot-overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(26,26,46,0.92);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(6px); padding: 20px;
+}
+#forgot-dialog {
+  position: relative; background: #fff; border-radius: 24px;
+  padding: 30px 28px; width: 100%; max-width: 380px;
+  max-height: 92vh; overflow-y: auto; text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5); animation: pop-in .25s ease;
+}
+#forgot-close {
+  position: absolute; top: 12px; right: 14px;
+  background: none; border: none; font-size: 20px; color: #bbb;
+  cursor: pointer; line-height: 1;
+}
+#forgot-fox { font-size: 44px; margin-bottom: 8px; }
+#forgot-dialog h2 { font-size: 20px; font-weight: 900; color: var(--foxi-brown); margin-bottom: 6px; }
+#forgot-intro { font-size: 14px; color: #888; margin-bottom: 18px; }
+#forgot-methods { display: flex; flex-direction: column; gap: 10px; }
+#forgot-dialog .form-group { text-align: left; margin-bottom: 12px; }
+#forgot-dialog .form-group label { color: #666; }
+.forgot-q {
+  font-size: 15px; font-weight: 800; color: var(--foxi-brown);
+  background: #fff4ee; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px;
+}
+#forgot-email-info { text-align: left; }
+#forgot-msg { font-size: 14px; font-weight: 700; margin-top: 12px; }
+#forgot-msg.ok  { color: #2e7d32; }
+#forgot-msg.err { color: var(--foxi-red); }
+#forgot-back {
+  margin-top: 14px; background: none; border: none;
+  color: #888; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+
+/* ── Wiederherstellung + Bug-Bild ────────────────────────────────── */
+.hint-inline { font-weight: 400; color: #999; font-size: 12px; }
+#recovery-setup { margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 16px; }
+#recovery-setup h3 { font-size: 16px; margin-bottom: 6px; }
+#bug-image-preview { margin-top: 10px; display: flex; align-items: center; gap: 12px; }
+#bug-image-thumb { max-width: 90px; max-height: 90px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); }
+#bug-image-remove { background: none; border: none; color: var(--foxi-red); font-size: 13px; font-weight: 700; cursor: pointer; }
 
 #pin-dots-row { display: flex; justify-content: center; gap: 14px; margin-bottom: 16px; }
 .pin-dot {
@@ -770,7 +823,7 @@ body[data-age="klein"] .fav-card img { width: 68px; height: 68px; margin-bottom:
 body[data-age="klein"] .fav-card span.fav-label { font-size: 16px; font-weight: 900; }
 body[data-age="klein"] .fav-card:hover { transform: translateY(-8px) scale(1.05); }
 
-/* Gross (11-14): Kompakter blauer Header, horizontale Kacheln */
+/* Gross (11-14): Kompakter blauer Header, gleiche Karten wie die anderen Profile */
 body[data-age="gross"] #home-header {
   background: linear-gradient(135deg, #3F51B5 0%, #5C6BC0 100%);
   border-radius: 20px; padding: 16px 22px; gap: 14px;
@@ -779,18 +832,9 @@ body[data-age="gross"] #foxi-mascot { width: 70px; height: 70px; object-fit: con
 body[data-age="gross"] #home-time-badge { background: rgba(255,255,255,.2); color: white; }
 body[data-age="gross"] #home-greeting { color: white; font-size: 18px; font-weight: 800; }
 body[data-age="gross"] #home-subtitle { color: rgba(255,255,255,.75); font-size: 12px; }
-body[data-age="gross"] #favorites-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-body[data-age="gross"] .fav-card {
-  flex-direction: row; align-items: center;
-  padding: 14px 18px; border-radius: 16px; gap: 14px; justify-content: flex-start;
-}
-body[data-age="gross"] .fav-card::before {
-  width: 5px; height: 100%; top: 0; left: 0; right: auto; border-radius: 16px 0 0 16px;
-}
-body[data-age="gross"] .fav-card .fav-emoji { font-size: 28px; margin-bottom: 0; flex-shrink: 0; }
-body[data-age="gross"] .fav-card img { width: 34px; height: 34px; margin-bottom: 0; border-radius: 8px; flex-shrink: 0; }
-body[data-age="gross"] .fav-card span.fav-label { font-size: 14px; font-weight: 700; text-align: left; }
-body[data-age="gross"] .fav-card:hover { transform: translateX(4px); border-color: var(--card-color, #3F51B5); }
+/* GroÃŸ nutzt jetzt das gleiche vertikale Karten-Layout wie klein/mittel,
+   nur ueber die Theme-Variablen (Groesse/Farbe) angepasst. */
+body[data-age="gross"] .fav-card:hover { border-color: var(--theme-accent, #3F51B5); }
 
 /* ── FERNZUGRIFF (Remote Control Tab) ─────────────────────────────────────── */
 .remote-toggle-row {

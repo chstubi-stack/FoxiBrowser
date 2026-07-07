@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
+        content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://www.google.com https://*.gstatic.com;">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
@@ -142,6 +142,48 @@
         <button class="pin-key" data-digit="0">0</button>
         <button class="pin-key pin-cancel-key" id="pin-cancel">✕</button>
       </div>
+      <button type="button" id="pin-forgot-link">PIN vergessen?</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- PIN-ZURÜCKSETZEN-OVERLAY                                                -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="forgot-overlay" class="hidden">
+    <div id="forgot-dialog">
+      <button type="button" id="forgot-close" title="Schließen">✕</button>
+      <div id="forgot-fox">🦊🔑</div>
+      <h2>PIN zurücksetzen</h2>
+      <p id="forgot-intro">Wähle eine Methode, um eine neue Eltern-PIN zu setzen.</p>
+
+      <div id="forgot-methods">
+        <button type="button" class="action-btn" id="forgot-m-question">🔐 Sicherheitsfrage beantworten</button>
+        <button type="button" class="action-btn" id="forgot-m-email">✉️ Code per E-Mail senden</button>
+      </div>
+
+      <!-- Weg 1: Sicherheitsfrage -->
+      <div id="forgot-question-form" class="hidden">
+        <p id="forgot-question-text" class="forgot-q"></p>
+        <div class="form-group"><label>Antwort</label><input type="text" id="forgot-answer" maxlength="120" placeholder="Deine Antwort"/></div>
+        <div class="form-group"><label>Neue PIN (4 Ziffern)</label><input type="password" id="forgot-newpin-q" maxlength="4" inputmode="numeric" placeholder="••••"/></div>
+        <div class="form-group"><label>Neue PIN bestätigen</label><input type="password" id="forgot-newpin-q2" maxlength="4" inputmode="numeric" placeholder="••••"/></div>
+        <button type="button" class="action-btn" id="forgot-submit-q">✓ PIN zurücksetzen</button>
+      </div>
+
+      <!-- Weg 2: E-Mail-Code -->
+      <div id="forgot-email-form" class="hidden">
+        <p id="forgot-email-info" class="hint-text"></p>
+        <button type="button" class="action-btn" id="forgot-send-code">✉️ Code senden</button>
+        <div id="forgot-code-fields" class="hidden">
+          <div class="form-group"><label>Code aus der E-Mail</label><input type="text" id="forgot-code" maxlength="8" inputmode="numeric" placeholder="6-stelliger Code"/></div>
+          <div class="form-group"><label>Neue PIN (4 Ziffern)</label><input type="password" id="forgot-newpin-e" maxlength="4" inputmode="numeric" placeholder="••••"/></div>
+          <div class="form-group"><label>Neue PIN bestätigen</label><input type="password" id="forgot-newpin-e2" maxlength="4" inputmode="numeric" placeholder="••••"/></div>
+          <button type="button" class="action-btn" id="forgot-submit-e">✓ PIN zurücksetzen</button>
+        </div>
+      </div>
+
+      <p id="forgot-msg" class="hidden"></p>
+      <button type="button" id="forgot-back" class="hidden">‹ Zurück zur Auswahl</button>
     </div>
   </div>
 
@@ -176,6 +218,7 @@
         <button class="tab-btn" data-tab="profile">👶 Kind-Profil</button>
         <button class="tab-btn" data-tab="bugreport">🐛 Bug melden</button>
         <button class="tab-btn" data-tab="remote">🌐 Fernzugriff</button>
+        <button class="tab-btn" data-tab="system">⚙️ System</button>
       </div>
 
       <!-- Tab: Verlauf -->
@@ -314,6 +357,25 @@
         <div id="pin-info-box">
           <p>💡 <strong>Tipp:</strong> Die Standard-PIN ist <strong>1234</strong>. Bitte ändere sie bei der ersten Nutzung.</p>
         </div>
+
+        <div id="recovery-setup">
+          <h3>🔐 PIN-Wiederherstellung</h3>
+          <p class="hint-text">Falls du die PIN vergisst, kannst du sie über eine Sicherheitsfrage oder per E-Mail-Code zurücksetzen. Bitte jetzt einrichten.</p>
+          <div class="form-group">
+            <label>Sicherheitsfrage</label>
+            <input type="text" id="rec-question" placeholder="z.B. Wie hieß dein erstes Haustier?" maxlength="120"/>
+          </div>
+          <div class="form-group">
+            <label>Antwort <span class="hint-inline">(Groß-/Kleinschreibung egal)</span></label>
+            <input type="text" id="rec-answer" placeholder="Antwort eingeben (leer lassen = unverändert)" maxlength="120"/>
+          </div>
+          <div class="form-group">
+            <label>Wiederherstellungs-E-Mail <span class="hint-inline">(optional)</span></label>
+            <input type="email" id="rec-email" placeholder="eltern@example.de" maxlength="160"/>
+          </div>
+          <p id="rec-msg" class="hidden"></p>
+          <button type="button" class="action-btn" id="btn-save-recovery">✓ Wiederherstellung speichern</button>
+        </div>
       </div>
 
       <!-- Tab: Bug melden -->
@@ -328,8 +390,28 @@
           <label>Beschreibung (Was ist passiert?)</label>
           <textarea id="bug-body" rows="5" placeholder="Schreibe hier was genau passiert ist, was du erwartet hast und welche Version du nutzt…" maxlength="2000"></textarea>
         </div>
+        <div class="form-group">
+          <label>Screenshot / Bild <span class="hint-inline">(optional, max. 5 MB)</span></label>
+          <input type="file" id="bug-image" title="Screenshot oder Bild auswählen" accept="image/png,image/jpeg,image/webp,image/gif"/>
+          <div id="bug-image-preview" class="hidden">
+            <img id="bug-image-thumb" alt="Vorschau"/>
+            <button type="button" id="bug-image-remove" title="Bild entfernen">✕ Bild entfernen</button>
+          </div>
+        </div>
         <p id="bug-msg" class="hidden"></p>
         <button type="button" class="action-btn" id="btn-send-bug">📤 Bericht absenden</button>
+      </div>
+
+      <!-- Tab: System -->
+      <div class="tab-content hidden" id="tab-system">
+        <h3>⚙️ System</h3>
+        <div class="form-group">
+          <label>Standard-Browser</label>
+          <p class="hint-text">Lege FoxiBrowser als Standard-Browser fest, damit Links aus anderen Programmen sicher hier geöffnet werden (mit Eltern-PIN-Abfrage).</p>
+          <p id="default-browser-status" class="hint-text" style="font-weight:700"></p>
+          <button type="button" class="action-btn" id="btn-set-default-browser">🌐 Als Standard-Browser festlegen</button>
+          <p class="hint-text" style="margin-top:8px;font-size:.8rem;opacity:.85">Windows öffnet die Einstellungen – wähle dort unter „Webbrowser" FoxiBrowser aus. (Windows lässt kein automatisches Setzen zu.)</p>
+        </div>
       </div>
 
       <!-- Tab: Fernzugriff -->

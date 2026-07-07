@@ -5,6 +5,7 @@ const path = require('path');
 const fs   = require('fs');
 const http  = require('http');
 const os    = require('os');
+const crypto = require('crypto');
 const { exec } = require('child_process');
 
 // DNS-over-HTTPS: Cloudflare for Families
@@ -487,6 +488,17 @@ function remoteMainHtml(data) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>FoxiBrowser – Eltern-Bereich</title>
+<script>
+  // Theme so frueh wie moeglich setzen (kein Aufblitzen), ueberlebt das 3s-Polling via localStorage
+  (function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('foxi-remote-theme') || 'light'); } catch(e){} })();
+  function foxiToggleTheme(){
+    var r = document.documentElement;
+    var next = r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    r.setAttribute('data-theme', next);
+    try { localStorage.setItem('foxi-remote-theme', next); } catch(e){}
+    var b = document.getElementById('theme-toggle-btn'); if (b) b.textContent = next === 'dark' ? '☀️' : '🌙';
+  }
+</script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:system-ui,sans-serif;background:#f5f5f5;color:#222;min-height:100vh}
@@ -561,14 +573,45 @@ function remoteMainHtml(data) {
   .rh-url{font-size:.75rem;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
   .rh-dur{font-size:.75rem;color:#FF6B35;font-weight:700;margin-top:2px}
   .rh-time{font-size:.75rem;color:#555;flex-shrink:0;white-space:nowrap}
+  /* ── Darkmode ─────────────────────────────────────────────── */
+  .theme-toggle{margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.05rem;line-height:1;flex-shrink:0}
+  .theme-toggle:hover{background:rgba(255,255,255,.32)}
+  header .logout{margin-left:12px}
+  :root[data-theme="dark"] body{background:#14161a;color:#e2e2e2}
+  :root[data-theme="dark"] .status-bar{background:#1e2127;border-bottom-color:#2a2e35}
+  :root[data-theme="dark"] .current-page{background:#2a2e35;color:#bbb}
+  :root[data-theme="dark"] .current-page.home{color:#888}
+  :root[data-theme="dark"] .current-page a{color:#5b9bff}
+  :root[data-theme="dark"] .tabs{background:#1e2127;border-bottom-color:#2a2e35}
+  :root[data-theme="dark"] .card{background:#1e2127;box-shadow:0 1px 6px rgba(0,0,0,.4)}
+  :root[data-theme="dark"] .card h2{color:#bbb}
+  :root[data-theme="dark"] .progress-wrap{background:#2a2e35}
+  :root[data-theme="dark"] .usage-sub,:root[data-theme="dark"] .wb-label{color:#999}
+  :root[data-theme="dark"] .wb-val{color:#bbb}
+  :root[data-theme="dark"] td{border-bottom-color:#2a2e35}
+  :root[data-theme="dark"] .h-host{color:#ddd}
+  :root[data-theme="dark"] .h-title{color:#999}
+  :root[data-theme="dark"] .time-row label{color:#bbb}
+  :root[data-theme="dark"] .time-input,:root[data-theme="dark"] .week-table select{background:#2a2e35;color:#eee;border-color:#3a3e45}
+  :root[data-theme="dark"] .age-card{border-color:#3a3e45;background:#1e2127}
+  :root[data-theme="dark"] .age-card.selected{background:#2c2420;border-color:#FF6B35}
+  :root[data-theme="dark"] .age-card .age-name{color:#ddd}
+  :root[data-theme="dark"] .week-table tr,:root[data-theme="dark"] .week-table td{border-bottom-color:#2a2e35}
+  :root[data-theme="dark"] .week-table td:first-child{color:#ccc}
+  :root[data-theme="dark"] .rh-url{color:#777}
 </style>
 </head>
 <body>
 <header>
   <span class="fox">🦊</span>
   <h1>FoxiBrowser – Eltern-Bereich</h1>
+  <button type="button" id="theme-toggle-btn" class="theme-toggle" onclick="foxiToggleTheme()" title="Hell/Dunkel umschalten">🌙</button>
   <form method="POST" action="/logout" style="margin:0"><button type="submit" class="logout">Abmelden</button></form>
 </header>
+<script>
+  // Toggle-Icon an gespeichertes Theme anpassen
+  (function(){ var b=document.getElementById('theme-toggle-btn'); if(b) b.textContent = document.documentElement.getAttribute('data-theme')==='dark' ? '☀️' : '🌙'; })();
+</script>
 
 <div class="status-bar">
   <div class="status-dot ${paused ? 'paused' : 'active'}"></div>
@@ -1258,12 +1301,42 @@ ipcMain.on('install-update', () => {
 
 ipcMain.on('open-external', (_, url) => { if (url.startsWith('http')) shell.openExternal(url); });
 
-ipcMain.handle('create-bug-report', async (_, { title, body }) => {
+// Screenshots gehen in ein PRIVATES Repo (nicht ins oeffentliche FoxiBrowser-Repo)
+const BUG_IMAGE_REPO = 'chstubi-stack/foxibrowser-bugimages';
+
+async function uploadBugImage(token, dataUrl) {
+  const m = /^data:(image\/(png|jpe?g|webp|gif));base64,(.+)$/i.exec(dataUrl || '');
+  if (!m) return null;
+  let ext = m[2].toLowerCase(); if (ext === 'jpeg') ext = 'jpg';
+  const b64 = m[3];
+  if (b64.length > 7000000) throw new Error('Bild zu groß (max. ~5 MB).');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const pathInRepo = `images/${stamp}-${Math.floor(Math.random() * 10000)}.${ext}`;
+  const res = await fetch(`https://api.github.com/repos/${BUG_IMAGE_REPO}/contents/${pathInRepo}`, {
+    method: 'PUT',
+    headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'FoxiBrowser' },
+    body: JSON.stringify({ message: `Bug-Screenshot ${stamp}`, content: b64 }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.ok && data.content) return data.content.html_url;
+  throw new Error(data.message || ('Upload-Fehler ' + res.status));
+}
+
+ipcMain.handle('create-bug-report', async (_, { title, body, image }) => {
   const token = process.env.GH_TOKEN ||
     (() => { try { return require('child_process').execSync(
       'powershell -command "[System.Environment]::GetEnvironmentVariable(\'GH_TOKEN\',\'User\')"',
       { encoding: 'utf8' }).trim(); } catch (_) { return ''; } })();
   if (!token) return { ok: false, error: 'Kein GitHub-Token gefunden.' };
+  let imageNote = '';
+  if (image) {
+    try {
+      const url = await uploadBugImage(token, image);
+      if (url) imageNote = `\n\n📷 **Screenshot (privates Repo, nur für Entwickler sichtbar):** ${url}`;
+    } catch (e) {
+      imageNote = `\n\n⚠️ _Screenshot konnte nicht hochgeladen werden: ${e.message}_`;
+    }
+  }
   try {
     const res = await fetch('https://api.github.com/repos/chstubi-stack/FoxiBrowser/issues', {
       method: 'POST',
@@ -1274,7 +1347,7 @@ ipcMain.handle('create-bug-report', async (_, { title, body }) => {
       },
       body: JSON.stringify({
         title: title.trim(),
-        body: `${body.trim()}\n\n---\n_Gesendet von FoxiBrowser v${app.getVersion()}_`,
+        body: `${body.trim()}${imageNote}\n\n---\n_Gesendet von FoxiBrowser v${app.getVersion()}_`,
         labels: ['bug'],
       }),
     });
@@ -1345,6 +1418,119 @@ ipcMain.handle('verify-pin', async (_, pin) => {
   const s = await getStore();
   const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
   return pin === settings.pin;
+});
+
+// Standard-Browser: Status abfragen + setzen
+// Hinweis: Windows 10/11 erlaubt Apps KEIN automatisches Setzen als Standard-Browser.
+// Wir registrieren uns als http/https-Handler und oeffnen die Windows-Einstellungen,
+// wo der Nutzer FoxiBrowser manuell auswaehlt.
+ipcMain.handle('get-default-browser-status', () => {
+  try { return app.isDefaultProtocolClient('http'); } catch (_) { return false; }
+});
+ipcMain.handle('set-default-browser', () => {
+  try {
+    app.setAsDefaultProtocolClient('http');
+    app.setAsDefaultProtocolClient('https');
+  } catch (e) { console.warn('[FoxiBrowser] setAsDefaultProtocolClient:', e.message); }
+  try { shell.openExternal('ms-settings:defaultapps'); } catch (_) {}
+  return { ok: true };
+});
+
+// ── PIN-WIEDERHERSTELLUNG (Sicherheitsfrage + E-Mail-Code) ─────────────────────
+// SMTP-Daten liegen NICHT in der App, sondern serverseitig in reset.php auf
+// foxibrowser.de. Der Client ruft nur den Relay-Endpunkt auf.
+const RESET_ENDPOINT = 'https://foxibrowser.de/reset.php';
+const RESET_SECRET   = 'fx_reset_2b9d4e7a1c6f8035';
+let resetCode = null; // { code, expires } – nur im Speicher
+
+function hashAnswer(answer) {
+  return crypto.createHash('sha256').update('foxi:' + String(answer || '').trim().toLowerCase()).digest('hex');
+}
+function maskEmail(email) {
+  if (!email || !email.includes('@')) return '';
+  const [u, d] = email.split('@');
+  const um = u.length <= 2 ? u[0] + '*' : u[0] + '*'.repeat(u.length - 2) + u[u.length - 1];
+  return um + '@' + d;
+}
+function validEmail(e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e || ''); }
+
+ipcMain.handle('get-recovery-setup', async () => {
+  const s = await getStore();
+  const settings = s.get('settings', {});
+  return {
+    hasQuestion: !!settings.securityQuestion,
+    question:    settings.securityQuestion || '',
+    hasEmail:    !!settings.recoveryEmail,
+    emailMasked: maskEmail(settings.recoveryEmail || ''),
+  };
+});
+
+ipcMain.handle('save-recovery-setup', async (_, { question, answer, email }) => {
+  const s = await getStore();
+  const settings = s.get('settings', {});
+  if (question !== undefined) {
+    const q = (question || '').trim();
+    if (q) {
+      settings.securityQuestion = q;
+      if (answer) settings.securityAnswerHash = hashAnswer(answer);
+      if (!settings.securityAnswerHash) return { ok: false, error: 'Bitte auch eine Antwort eingeben.' };
+    } else {
+      delete settings.securityQuestion;
+      delete settings.securityAnswerHash;
+    }
+  }
+  if (email !== undefined) {
+    const e = (email || '').trim();
+    if (e && validEmail(e)) settings.recoveryEmail = e;
+    else if (!e) delete settings.recoveryEmail;
+    else return { ok: false, error: 'E-Mail-Adresse ungültig.' };
+  }
+  s.set('settings', settings);
+  return { ok: true };
+});
+
+ipcMain.handle('reset-pin-via-answer', async (_, { answer, newPin }) => {
+  const s = await getStore();
+  const settings = s.get('settings', {});
+  if (!settings.securityAnswerHash) return { ok: false, error: 'Keine Sicherheitsfrage eingerichtet.' };
+  if (!/^\d{4}$/.test(newPin || '')) return { ok: false, error: 'Neue PIN muss genau 4 Ziffern haben.' };
+  if (hashAnswer(answer) !== settings.securityAnswerHash) return { ok: false, error: 'Antwort ist leider falsch.' };
+  settings.pin = newPin;
+  s.set('settings', settings);
+  return { ok: true };
+});
+
+ipcMain.handle('send-reset-code', async () => {
+  const s = await getStore();
+  const settings = s.get('settings', {});
+  const email = settings.recoveryEmail;
+  if (!email) return { ok: false, error: 'Keine Wiederherstellungs-E-Mail hinterlegt.' };
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  resetCode = { code, expires: Date.now() + 15 * 60 * 1000 };
+  try {
+    const res = await fetch(RESET_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': 'FoxiBrowser' },
+      body: JSON.stringify({ secret: RESET_SECRET, email, code }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) return { ok: true, emailMasked: maskEmail(email) };
+    return { ok: false, error: 'Versand fehlgeschlagen (' + (data.error || res.status) + ').' };
+  } catch (e) {
+    return { ok: false, error: 'Server nicht erreichbar: ' + e.message };
+  }
+});
+
+ipcMain.handle('reset-pin-via-code', async (_, { code, newPin }) => {
+  if (!resetCode || Date.now() > resetCode.expires) return { ok: false, error: 'Code abgelaufen – bitte neu anfordern.' };
+  if (!/^\d{4}$/.test(newPin || '')) return { ok: false, error: 'Neue PIN muss genau 4 Ziffern haben.' };
+  if (String(code || '').trim() !== resetCode.code) return { ok: false, error: 'Code ist falsch.' };
+  const s = await getStore();
+  const settings = s.get('settings', {});
+  settings.pin = newPin;
+  s.set('settings', settings);
+  resetCode = null;
+  return { ok: true };
 });
 
 // Verlauf
@@ -1430,20 +1616,40 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
 });
 
 // ── SINGLE INSTANCE LOCK ─────────────────────────────────────────────────────
+// ── STANDARD-BROWSER: eingehende URLs (falls FoxiBrowser als http-Handler laeuft) ──
+// Windows startet die App mit der Ziel-URL als Argument. Diese laeuft absichtlich
+// durchs PIN-Gate (nav-needs-pin) – konsistent mit dem Kinderschutz-Modell.
+function extractUrlFromArgv(argv) {
+  if (!Array.isArray(argv)) return null;
+  return argv.find(a => typeof a === 'string' && /^https?:\/\//i.test(a)) || null;
+}
+function openIncomingUrl(rawUrl) {
+  const clean = rawUrl && sanitizeUrl(rawUrl);
+  if (!clean || !mainWindow || mainWindow.isDestroyed()) return;
+  const wc = mainWindow.webContents;
+  const send = () => { if (!wc.isDestroyed()) wc.send('nav-needs-pin', clean); };
+  if (wc.isLoading()) wc.once('did-finish-load', () => setTimeout(send, 300));
+  else send();
+}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_e, argv) => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
+    openIncomingUrl(extractUrlFromArgv(argv));
   });
 }
 
 // ── APP LIFECYCLE ─────────────────────────────────────────────────────────────
-app.whenReady().then(() => createWindow().catch(e => {
+app.whenReady().then(() => createWindow().then(() => {
+  // Beim Start per Link geoeffnet? URL aus argv aufgreifen
+  openIncomingUrl(extractUrlFromArgv(process.argv));
+}).catch(e => {
   console.error('[FoxiBrowser] Kritischer Startfehler:', e);
   app.quit();
 }));
