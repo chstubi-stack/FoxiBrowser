@@ -1015,6 +1015,18 @@ window.foxiAPI.onPopupRequested(url => {
   );
 });
 
+// Ein Link führt auf eine fremde Seite → Eltern-PIN verlangen, bevor gewechselt wird
+window.foxiAPI.onNavNeedsPin(url => {
+  let label = url;
+  try { label = new URL(url).hostname.replace(/^www\./, ''); } catch (_) {}
+  openPinDialog(
+    'Mama oder Papa fragen!',
+    `Neue Seite öffnen: ${label}`,
+    () => { showBrowser(url); },
+    () => {}
+  );
+});
+
 window.foxiAPI.onPopupRedirect(url => {
   showBrowser(url);
 });
@@ -1112,8 +1124,17 @@ window.foxiAPI.onRemoteResume(() => {
   timeLimitReached = false;
   showHome();
 });
-window.foxiAPI.onRemoteSetAge(age => {
+window.foxiAPI.onRemoteSetAge(async age => {
   applyAgeTheme(age);
+  selectedAge = age;
+  // Favoriten auf die Standard-Liste der neuen Altersgruppe setzen (wie beim lokalen Wechsel)
+  if (AGE_PROFILES[age]) {
+    currentFavorites = [...AGE_PROFILES[age].favorites];
+    await window.foxiAPI.setFavorites(currentFavorites);
+    renderFavGrid();
+  }
+  // Auswahl im Eltern-Panel (Profil-Tab) spiegeln, falls geöffnet
+  document.querySelectorAll('.age-card').forEach(c => c.classList.toggle('selected', c.dataset.age === age));
 });
 
 // ── Chat-Overlay (Nachricht von Eltern) ──────────────────────────────────

@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   onUpdateProgress:   (cb)  => ipcRenderer.on('update-progress', (_, data) => cb(data)),
   onUpdateDownloaded: (cb)  => ipcRenderer.on('update-downloaded', (_, info) => cb(info)),
   onPopupRequested:   (cb)  => ipcRenderer.on('popup-requested', (_, url) => cb(url)),
+  onNavNeedsPin:      (cb)  => ipcRenderer.on('nav-needs-pin', (_, url) => cb(url)),
   // Remote Control
   getRemoteStatus:    ()        => ipcRenderer.invoke('get-remote-status'),
   setRemoteEnabled:   (enabled) => ipcRenderer.invoke('set-remote-enabled', enabled),

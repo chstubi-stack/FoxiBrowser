@@ -44,6 +44,25 @@ function isDomainBlocked(hostname) {
   return false;
 }
 
+// Bekannte zweistufige Top-Level-Domains (damit z. B. bbc.co.uk nicht als "co.uk" gilt)
+const TWO_LEVEL_TLDS = new Set([
+  'co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'me.uk', 'ltd.uk',
+  'com.au', 'net.au', 'org.au', 'edu.au', 'gov.au',
+  'co.jp', 'ne.jp', 'or.jp', 'go.jp',
+  'co.nz', 'com.br', 'com.mx', 'co.in', 'co.za', 'com.tr',
+]);
+
+// Registrierbare Basis-Domain ermitteln (en.wikipedia.org + de.wikipedia.org → wikipedia.org)
+function baseDomain(hostname) {
+  if (!hostname) return '';
+  const h = hostname.replace(/^www\./, '').toLowerCase();
+  const parts = h.split('.');
+  if (parts.length <= 2) return h;
+  const lastTwo   = parts.slice(-2).join('.');
+  const lastThree = parts.slice(-3).join('.');
+  return TWO_LEVEL_TLDS.has(lastTwo) ? lastThree : lastTwo;
+}
+
 // ── STORE ─────────────────────────────────────────────────────────────────────
 let _store = null;
 async function getStore() {
@@ -53,6 +72,13 @@ async function getStore() {
     // Standard-PIN beim ersten Start setzen
     if (!_store.has('settings')) {
       _store.set('settings', { pin: '1234', timeLimitMinutes: 0 });
+    }
+    // Migration: altes Feld childAge → ageProfile (einheitliches Feld)
+    const settings = _store.get('settings', {});
+    if (settings.childAge !== undefined) {
+      if (settings.ageProfile === undefined) settings.ageProfile = settings.childAge;
+      delete settings.childAge;
+      _store.set('settings', settings);
     }
   }
   return _store;
@@ -453,7 +479,7 @@ function remoteMainHtml(data) {
   }).join('');
 
   const ageLabels = { klein:'Klein (3–6)', mittel:'Mittel (7–10)', gross:'Groß (11–14)' };
-  const currentAge = settings.childAge || 'mittel';
+  const currentAge = settings.ageProfile || 'mittel';
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -1044,7 +1070,8 @@ async function startRemoteServer() {
       const form = parseForm(await readBody(req));
       const age = ['klein','mittel','gross'].includes(form.age) ? form.age : 'mittel';
       const settings = store.get('settings', { pin: '1234', timeLimitMinutes: 0 });
-      settings.childAge = age;
+      settings.ageProfile = age;
+      delete settings.childAge; // altes Feld bereinigen
       store.set('settings', settings);
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-set-age', age);
       res.writeHead(302, { Location: '/' });
@@ -1438,10 +1465,29 @@ app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) creat
 
 app.on('web-contents-created', (_, contents) => {
   contents.on('will-navigate', (event, url) => {
-    try {
-      const { protocol } = new URL(url);
-      if (!ALLOWED_PROTOCOLS.has(protocol) && protocol !== 'about:' && protocol !== 'file:') event.preventDefault();
-    } catch (_) { event.preventDefault(); }
+    let parsed;
+    try { parsed = new URL(url); } catch (_) { event.preventDefault(); return; }
+    const { protocol } = parsed;
+    // Nur http(s)/about/file erlauben
+    if (!ALLOWED_PROTOCOLS.has(protocol) && protocol !== 'about:' && protocol !== 'file:') {
+      event.preventDefault();
+      return;
+    }
+    // PIN-Gate: Ein Link auf einer Seite darf das Kind nicht ungefragt auf eine
+    // FREMDE Domain führen (z. B. externe Links auf Wikipedia). Nur der Kind-<webview>
+    // wird geprüft; von der App per loadURL gestartete Navigationen lösen kein
+    // will-navigate aus und sind daher nie betroffen.
+    if (contents.getType() === 'webview' && ALLOWED_PROTOCOLS.has(protocol)) {
+      let currentHost = '';
+      try { currentHost = new URL(contents.getURL()).hostname; } catch (_) {}
+      // Erste Seite/about:blank durchlassen; sonst nur gleiche Basis-Domain erlauben
+      if (currentHost && baseDomain(parsed.hostname) !== baseDomain(currentHost)) {
+        event.preventDefault();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('nav-needs-pin', url);
+        }
+      }
+    }
   });
   contents.setWindowOpenHandler(({ url }) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
