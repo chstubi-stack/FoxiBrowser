@@ -113,10 +113,29 @@ function showBlocked(data) {
   lockIcon.style.opacity = '0.35';
 }
 
+function pauseWebviewMedia() {
+  // Läuft im Kind-Webview: alle Video/Audio-Elemente pausieren (auch in
+  // gleichartigen iframes), damit bei Pause/Zeitlimit nicht heimlich
+  // im Hintergrund weiter Video/Ton läuft.
+  const code = `(function(){
+    function pauseAll(doc){
+      try {
+        doc.querySelectorAll('video, audio').forEach(function(el){ try { el.pause(); } catch(e){} });
+        doc.querySelectorAll('iframe').forEach(function(f){
+          try { if (f.contentDocument) pauseAll(f.contentDocument); } catch(e){}
+        });
+      } catch(e){}
+    }
+    pauseAll(document);
+  })();`;
+  try { webview.executeJavaScript(code).catch(() => {}); } catch (_) {}
+}
+
 function showTimeLimitPage() {
   timeLimitReached = true;
   hideAll();
   timeLimitPage.classList.remove('hidden');
+  pauseWebviewMedia();
 }
 
 function updateLockIcon(url) {
@@ -318,7 +337,14 @@ async function loadFavorites() {
   const age = settings.ageProfile || 'mittel';
   applyAgeTheme(age);
   const saved = await window.foxiAPI.getFavorites();
-  currentFavorites = saved || [...AGE_PROFILES[age].favorites];
+  if (saved) {
+    currentFavorites = saved;
+  } else {
+    // Noch nie gespeichert (Erststart) → Alters-Standardliste übernehmen und
+    // persistieren, damit sie z.B. im Fernzugriff bearbeitet werden kann.
+    currentFavorites = [...AGE_PROFILES[age].favorites];
+    await window.foxiAPI.setFavorites(currentFavorites);
+  }
   renderFavGrid();
 }
 
@@ -1318,6 +1344,10 @@ window.foxiAPI.onRemotePause(() => {
 window.foxiAPI.onRemoteResume(() => {
   timeLimitReached = false;
   showHome();
+});
+window.foxiAPI.onRemoteFavoritesUpdated(favs => {
+  currentFavorites = favs;
+  renderFavGrid();
 });
 window.foxiAPI.onRemoteSetAge(async age => {
   applyAgeTheme(age);

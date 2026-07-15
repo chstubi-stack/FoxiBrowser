@@ -416,7 +416,7 @@ function remoteLoginHtml(error) {
 }
 
 function remoteMainHtml(data) {
-  const { history, usageToday, usageWeek, settings, todayLimit, paused, childUrl, childTitle } = data;
+  const { history, usageToday, usageWeek, settings, todayLimit, paused, childUrl, childTitle, favorites } = data;
   const usedMin  = Math.floor(usageToday / 60);
   const usedSec  = usageToday % 60;
   const limitMin = todayLimit !== undefined ? todayLimit : (settings.timeLimitMinutes || 0);
@@ -481,6 +481,21 @@ function remoteMainHtml(data) {
 
   const ageLabels = { klein:'Klein (3–6)', mittel:'Mittel (7–10)', gross:'Groß (11–14)' };
   const currentAge = settings.ageProfile || 'mittel';
+
+  // Startseite-Kacheln (Favoriten)
+  const favList = favorites || [];
+  const favoritesHtml = favList.length ? favList.map((f, idx) => `
+    <div class="fav-row">
+      <span class="fav-row-emoji">${esc(f.emoji || '🌐')}</span>
+      <div class="fav-row-info">
+        <div class="fav-row-name">${esc(f.name)}</div>
+        <div class="fav-row-url">${esc(f.url)}</div>
+      </div>
+      <form method="POST" action="/delete-favorite" onsubmit="return confirm('Diese Kachel wirklich von der Startseite entfernen?')">
+        <input type="hidden" name="idx" value="${idx}">
+        <button type="submit" class="fav-del-btn" title="Entfernen">✕</button>
+      </form>
+    </div>`).join('') : '<p style="color:#888;font-size:.9rem">Noch keine Kacheln auf der Startseite.</p>';
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -573,6 +588,17 @@ function remoteMainHtml(data) {
   .rh-url{font-size:.75rem;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
   .rh-dur{font-size:.75rem;color:#FF6B35;font-weight:700;margin-top:2px}
   .rh-time{font-size:.75rem;color:#555;flex-shrink:0;white-space:nowrap}
+  .fav-list{display:flex;flex-direction:column;gap:8px}
+  .fav-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid #eee;border-radius:10px}
+  .fav-row-emoji{font-size:1.4rem;flex-shrink:0}
+  .fav-row-info{flex:1;min-width:0}
+  .fav-row-name{font-weight:700;font-size:.9rem;color:#333}
+  .fav-row-url{font-size:.75rem;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fav-del-btn{background:#ffebee;color:#c62828;border:none;border-radius:8px;width:32px;height:32px;font-weight:800;cursor:pointer;flex-shrink:0;font-size:.9rem}
+  .fav-del-btn:hover{background:#ffcdd2}
+  .add-fav-form{display:flex;flex-direction:column;gap:10px}
+  .add-fav-form input{border:2px solid #eee;border-radius:8px;padding:10px 12px;font-size:.9rem;font-family:inherit}
+  .add-fav-form input:focus{border-color:#FF6B35;outline:none}
   /* ── Darkmode ─────────────────────────────────────────────── */
   .theme-toggle{margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.05rem;line-height:1;flex-shrink:0}
   .theme-toggle:hover{background:rgba(255,255,255,.32)}
@@ -599,6 +625,10 @@ function remoteMainHtml(data) {
   :root[data-theme="dark"] .week-table tr,:root[data-theme="dark"] .week-table td{border-bottom-color:#2a2e35}
   :root[data-theme="dark"] .week-table td:first-child{color:#ccc}
   :root[data-theme="dark"] .rh-url{color:#777}
+  :root[data-theme="dark"] .fav-row{border-color:#2a2e35}
+  :root[data-theme="dark"] .fav-row-name{color:#ddd}
+  :root[data-theme="dark"] .fav-row-url{color:#888}
+  :root[data-theme="dark"] .add-fav-form input{background:#2a2e35;color:#eee;border-color:#3a3e45}
 </style>
 </head>
 <body>
@@ -633,10 +663,11 @@ function remoteMainHtml(data) {
 </div>
 
 <div class="tabs">
-  <button class="tab active" onclick="showTab('time',this)">⏰ Nutzungszeit</button>
-  <button class="tab" onclick="showTab('history',this)">📋 Verlauf</button>
-  <button class="tab" id="chat-tab-btn" onclick="showTab('chat',this)">💬 Nachricht</button>
-  <button class="tab" onclick="showTab('settings',this)">⚙️ Einstellungen</button>
+  <button class="tab active" data-tab="time" onclick="showTab('time',this)">⏰ Nutzungszeit</button>
+  <button class="tab" data-tab="history" onclick="showTab('history',this)">📋 Verlauf</button>
+  <button class="tab" data-tab="favorites" onclick="showTab('favorites',this)">🏠 Startseite</button>
+  <button class="tab" data-tab="chat" id="chat-tab-btn" onclick="showTab('chat',this)">💬 Nachricht</button>
+  <button class="tab" data-tab="settings" onclick="showTab('settings',this)">⚙️ Einstellungen</button>
 </div>
 
 <div id="tab-time" class="panel active">
@@ -711,6 +742,23 @@ function remoteMainHtml(data) {
   </div>
 </div>
 
+<div id="tab-favorites" class="panel">
+  <div class="card">
+    <h2>Kacheln auf der Startseite</h2>
+    <p style="font-size:.8rem;color:#888;margin-bottom:14px">Diese Seiten kann dein Kind ohne PIN direkt öffnen. Kacheln hinzufügen oder entfernen wirkt sich sofort auf die Startseite im Browser aus.</p>
+    <div class="fav-list" id="fav-list">${favoritesHtml}</div>
+  </div>
+  <div class="card">
+    <h2>Neue Kachel hinzufügen</h2>
+    <form method="POST" action="/add-favorite" class="add-fav-form">
+      <input type="text" name="name" placeholder="Name (z. B. YouTube Kids)" maxlength="40" required>
+      <input type="text" name="url" placeholder="Adresse (z. B. youtube.com)" maxlength="300" required>
+      <input type="text" name="emoji" placeholder="Emoji (optional, z. B. 📺)" maxlength="4">
+      <button type="submit" class="save-btn">➕ Kachel hinzufügen</button>
+    </form>
+  </div>
+</div>
+
 <div id="tab-chat" class="panel">
   <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 220px);min-height:300px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
@@ -755,6 +803,13 @@ function selectAge(age) {
   document.querySelectorAll('.age-card').forEach(c => c.classList.remove('selected'));
   document.querySelector('.age-card input[value="' + age + '"]').closest('.age-card').classList.add('selected');
 }
+
+// Nach Redirects (z.B. von /add-favorite) den zuletzt aktiven Tab wiederherstellen
+(function(){
+  const hash = location.hash.replace('#', '');
+  const btn = hash && document.querySelector('.tab[data-tab="' + hash + '"]');
+  if (btn) showTab(hash, btn);
+})();
 
 // ── Tages-Limit Slider ────────────────────────────────────────────────────
 const rRange = document.getElementById('r-limit-range');
@@ -1122,6 +1177,39 @@ async function startRemoteServer() {
       return;
     }
 
+    // ── Startseite: Kachel hinzufügen ────────────────────────────
+    if (url === '/add-favorite' && req.method === 'POST') {
+      const form = parseForm(await readBody(req));
+      const name = (form.name || '').trim().substring(0, 40);
+      let favUrl = (form.url || '').trim().substring(0, 300);
+      const emoji = (form.emoji || '').trim().substring(0, 4) || '🌐';
+      if (name && favUrl) {
+        if (!/^https?:\/\//i.test(favUrl)) favUrl = 'https://' + favUrl;
+        const favorites = store.get('favorites', []) || [];
+        favorites.push({ name, url: favUrl, emoji, color: '#FF6B35' });
+        store.set('favorites', favorites);
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-favorites-updated', favorites);
+      }
+      res.writeHead(302, { Location: '/#favorites' });
+      res.end();
+      return;
+    }
+
+    // ── Startseite: Kachel löschen ────────────────────────────────
+    if (url === '/delete-favorite' && req.method === 'POST') {
+      const form = parseForm(await readBody(req));
+      const idx = parseInt(form.idx, 10);
+      const favorites = store.get('favorites', []) || [];
+      if (!isNaN(idx) && idx >= 0 && idx < favorites.length) {
+        favorites.splice(idx, 1);
+        store.set('favorites', favorites);
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-favorites-updated', favorites);
+      }
+      res.writeHead(302, { Location: '/#favorites' });
+      res.end();
+      return;
+    }
+
     // ── Live-Status JSON (für Auto-Polling) ─────────────────────
     if (url === '/api/status' && req.method === 'GET') {
       const usageData = store.get('usageData', {});
@@ -1236,7 +1324,8 @@ async function startRemoteServer() {
         const key = d.toISOString().slice(0, 10);
         usageWeek.push({ date: key, seconds: key === today ? getLiveUsedSeconds() : (usageData[key] || 0) });
       }
-      const html = remoteMainHtml({ history, usageToday, usageWeek, settings, todayLimit, paused: remotePaused, childUrl: currentChildUrl, childTitle: currentChildTitle });
+      const favorites = store.get('favorites', []) || [];
+      const html = remoteMainHtml({ history, usageToday, usageWeek, settings, todayLimit, paused: remotePaused, childUrl: currentChildUrl, childTitle: currentChildTitle, favorites });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
       return;

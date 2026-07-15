@@ -7,6 +7,9 @@ extraMetadata:
     name: Z3DPrint.de
     email: info@z3dprint.de
 
+# Dateinamen MIT Bindestrichen (Pflicht für electron-updater: muss exakt mit latest.yml übereinstimmen)
+artifactName: ${productName}-Setup-${version}.${ext}
+
 directories:
   output: build/installer
   buildResources: src/assets

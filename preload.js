@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   onRemotePause:      (cb)  => ipcRenderer.on('remote-pause', () => cb()),
   onRemoteResume:     (cb)  => ipcRenderer.on('remote-resume', () => cb()),
   onRemoteSetAge:     (cb)  => ipcRenderer.on('remote-set-age', (_, age) => cb(age)),
+  onRemoteFavoritesUpdated: (cb) => ipcRenderer.on('remote-favorites-updated', (_, favs) => cb(favs)),
   reportChildNav:     (url, title) => ipcRenderer.send('child-navigated', { url, title }),
   // Chat
   onChatMessage:      (cb)  => ipcRenderer.on('chat-message', (_, msg) => cb(msg)),
