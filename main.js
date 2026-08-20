@@ -183,7 +183,7 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280, height: 800, minWidth: 900, minHeight: 600,
     frame: false,
-    fullscreen: true,
+    show: false,
     icon: path.join(__dirname, 'src', 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -193,6 +193,13 @@ async function createWindow() {
       sandbox: false,
       devTools: false,
     }
+  });
+  // Maximiert starten (nicht echtes Vollbild) – Taskleiste bleibt sichtbar,
+  // Fenster verhält sich normal (verschiebbar, über Minimieren/Wiederherstellen
+  // steuerbar), füllt aber direkt den ganzen Bildschirm aus.
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize();
+    mainWindow.show();
   });
 
   const childSession = session.fromPartition('persist:child', { cache: true });
