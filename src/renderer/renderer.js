@@ -1473,5 +1473,16 @@ document.getElementById('parent-tabs').addEventListener('click', async e => {
 // ══════════════════════════════════════════════════════════════════════════
 
 loadFavorites();
-showHome();
+// Vor dem ersten Rendern prüfen, ob das Tageslimit bereits erreicht ist (z.B. weil
+// das Kind den Browser nach Ablauf der Zeit geschlossen und neu geöffnet hat) –
+// sonst würde kurz die Startseite aufblitzen, bevor der 'time-limit-reached'-Push
+// vom Hauptprozess eintrifft.
+window.foxiAPI.getTimeStatus().then(status => {
+  if (status && status.blocked) {
+    timeLimitReached = true;
+    showTimeLimitPage();
+  } else {
+    showHome();
+  }
+}).catch(() => showHome());
 showVersionInPanel();

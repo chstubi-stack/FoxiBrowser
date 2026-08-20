@@ -312,6 +312,12 @@ async function createWindow() {
   // Remote-Server starten falls in Einstellungen aktiviert
   getStore().then(async s => {
     const settings = s.get('settings', {});
+    // Eine vorher per Fernzugriff gesetzte Pause übersteht so einen Neustart
+    // von FoxiBrowser (siehe get-time-status für die eigentliche PIN-Sperre).
+    remotePaused = !!settings.remotePaused;
+    if (remotePaused && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('remote-pause');
+    }
     if (settings.remoteEnabled) {
       await addFirewallRule();
       startRemoteServer();
@@ -367,6 +373,16 @@ let remoteServer     = null;
 let remotePaused     = false;
 let currentChildUrl  = '';
 let currentChildTitle = '';
+
+// Merkt eine per Fernzugriff ausgelöste Pause im Store, damit sie nicht durch
+// Schließen+Neuöffnen des Browsers verloren geht (gleiches Problem wie beim
+// Tageslimit – siehe get-time-status).
+async function setRemotePausedPersisted(paused) {
+  const s = await getStore();
+  const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
+  settings.remotePaused = paused;
+  s.set('settings', settings);
+}
 // Chat zwischen Eltern (remote) und Kind (Browser)
 let chatMessages = []; // [{from:'parent'|'child', text, time}]
 
@@ -1124,6 +1140,7 @@ async function startRemoteServer() {
         remotePaused = false;
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-resume');
       }
+      await setRemotePausedPersisted(remotePaused);
       res.writeHead(302, { Location: '/' });
       res.end();
       return;
@@ -1370,11 +1387,12 @@ function removeFirewallRule() {
   runElevatedCmd(`netsh advfirewall firewall delete rule name="FoxiBrowser Fernzugriff"`);
 }
 
-function stopRemoteServer() {
+async function stopRemoteServer() {
   if (!remoteServer) return;
   remoteServer.close();
   remoteServer = null;
   remotePaused = false;
+  await setRemotePausedPersisted(false);
   console.log('[FoxiBrowser] Remote-Server gestoppt');
 }
 
@@ -1644,6 +1662,29 @@ ipcMain.handle('clear-history', async () => { const s = await getStore(); s.set(
 
 // Nutzungszeit
 ipcMain.handle('get-usage-today', async () => getUsedSeconds());
+// Autoritativer Status beim App-Start: verhindert, dass ein Neustart des Browsers
+// (Kind schließt Fenster nach Zeitlimit-Ablauf und öffnet Foxi erneut) die Sperre
+// kurzzeitig umgeht, weil der Renderer sonst erst showHome() zeigt und danach auf
+// den 'time-limit-reached'-Push wartet.
+ipcMain.handle('get-time-status', async () => {
+  const s            = await getStore();
+  const settings     = s.get('settings', {});
+  const limitMins    = await getLimitMinutes();
+  const usedSecs     = await getUsedSeconds();
+  const limitSecs    = limitMins * 60;
+  const remainingSecs = limitSecs - usedSecs;
+  // Direkt aus dem Store gelesen (nicht die In-Memory-Variable remotePaused),
+  // damit eine per Fernzugriff gesetzte Pause den Renderer-Start genauso
+  // race-frei blockiert wie ein abgelaufenes Tageslimit.
+  const isRemotePaused = !!settings.remotePaused;
+  return {
+    limitSeconds: limitSecs,
+    usedSeconds: usedSecs,
+    remainingSeconds: remainingSecs,
+    remotePaused: isRemotePaused,
+    blocked: isRemotePaused || (limitMins > 0 && remainingSecs <= 0),
+  };
+});
 ipcMain.handle('get-usage-week',  async () => {
   const s = await getStore();
   const data = s.get('usageData', {});
@@ -1692,7 +1733,7 @@ ipcMain.handle('set-remote-enabled', async (_, enabled) => {
     await addFirewallRule();  // UAC-Prompt erscheint hier
     await startRemoteServer();
   } else {
-    stopRemoteServer();
+    await stopRemoteServer();
     removeFirewallRule();
   }
   return { ok: true, ip: getLocalIp(), port: REMOTE_PORT };
