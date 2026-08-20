@@ -106,7 +106,7 @@
            src="about:blank"
            partition="persist:child"
            nodeintegration="false"
-           webpreferences="contextIsolation=yes, javascript=yes"
+           webpreferences="contextIsolation=yes, javascript=yes, devTools=no"
            allowpopups="false"
            class="hidden">
   </webview>
@@ -184,6 +184,19 @@
 
       <p id="forgot-msg" class="hidden"></p>
       <button type="button" id="forgot-back" class="hidden">‹ Zurück zur Auswahl</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- STANDARD-BROWSER-VORSCHLAG (nur beim allerersten Start)                 -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="default-browser-overlay" class="hidden">
+    <div id="default-browser-dialog">
+      <div id="default-browser-fox">🦊🌐</div>
+      <h2>FoxiBrowser als Standard-Browser festlegen?</h2>
+      <p>Dann öffnen sich Links aus anderen Apps (z. B. E-Mails) direkt sicher in FoxiBrowser statt in einem ungeschützten Browser.</p>
+      <button type="button" class="action-btn" id="dbp-set">🌐 Ja, als Standard festlegen</button>
+      <button type="button" id="dbp-later">Später</button>
     </div>
   </div>
 

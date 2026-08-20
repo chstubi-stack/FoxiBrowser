@@ -1486,3 +1486,25 @@ window.foxiAPI.getTimeStatus().then(status => {
   }
 }).catch(() => showHome());
 showVersionInPanel();
+checkDefaultBrowserPromptOnFirstRun();
+
+// ── Standard-Browser-Vorschlag (einmalig beim allerersten Start) ───────────
+async function checkDefaultBrowserPromptOnFirstRun() {
+  try {
+    const settings = await window.foxiAPI.getSettings();
+    if (settings.defaultBrowserPromptShown) return;
+    settings.defaultBrowserPromptShown = true;
+    await window.foxiAPI.setSettings(settings);
+    const isDefault = await window.foxiAPI.getDefaultBrowserStatus();
+    if (!isDefault) {
+      document.getElementById('default-browser-overlay').classList.remove('hidden');
+    }
+  } catch (_) {}
+}
+document.getElementById('dbp-set').addEventListener('click', async () => {
+  await window.foxiAPI.setDefaultBrowser();
+  document.getElementById('default-browser-overlay').classList.add('hidden');
+});
+document.getElementById('dbp-later').addEventListener('click', () => {
+  document.getElementById('default-browser-overlay').classList.add('hidden');
+});

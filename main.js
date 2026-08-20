@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, session, screen, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, session, screen, shell, Menu } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const http  = require('http');
@@ -176,9 +176,14 @@ async function checkTimeLimit() {
 let mainWindow = null;
 
 async function createWindow() {
+  // Keine native Menüleiste (Windows/Linux) – entfernt damit auch alle daran
+  // hängenden Standard-Tastenkürzel (u.a. Strg+R, F11-Rollen aus dem Default-Menü).
+  Menu.setApplicationMenu(null);
+
   mainWindow = new BrowserWindow({
     width: 1280, height: 800, minWidth: 900, minHeight: 600,
     frame: false,
+    fullscreen: true,
     icon: path.join(__dirname, 'src', 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -186,6 +191,7 @@ async function createWindow() {
       nodeIntegration: false,
       webviewTag: true,
       sandbox: false,
+      devTools: false,
     }
   });
 
@@ -1484,6 +1490,7 @@ ipcMain.on('allow-popup', (_, url) => {
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: false,
+      devTools: false,
     },
   });
 
@@ -1832,6 +1839,25 @@ app.on('web-contents-created', (_, contents) => {
     return { action: 'deny' };
   });
 
+
+  // Tastenkürzel sperren, mit denen das Kind die App verlassen oder Browser-
+  // eigene Funktionen (DevTools, Vollbild-Toggle) aufrufen könnte. Gilt für
+  // die App-Oberfläche UND das Kind-Webview gleichermaßen. Strg+Alt+Entf lässt
+  // sich technisch NICHT abfangen (Windows Secure Attention Sequence) – das
+  // wird hier bewusst nicht versucht.
+  contents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    const key = input.key.toLowerCase();
+    // Alt+F4: Fenster darf nur über den eigenen "X"-Button geschlossen werden
+    if (key === 'f4' && input.alt) { event.preventDefault(); return; }
+    // Strg+Umschalt+Esc: Task-Manager-Shortcut erschweren (keine Garantie,
+    // da Windows dies teils außerhalb der App abfängt)
+    if (key === 'escape' && input.control && input.shift) { event.preventDefault(); return; }
+    // F11 (natives Vollbild-Umschalten) und F12/Strg+Umschalt+I/J/C (DevTools,
+    // hier zusätzlich schon über webPreferences.devTools=false gesperrt)
+    if (key === 'f11' || key === 'f12') { event.preventDefault(); return; }
+    if (input.control && input.shift && ['i', 'j', 'c'].includes(key)) { event.preventDefault(); return; }
+  });
 
   // Cursor-Position beim Rechtsklick an Renderer senden
   contents.on('context-menu', (event, params) => {

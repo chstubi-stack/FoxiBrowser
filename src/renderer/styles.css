@@ -368,6 +368,27 @@ html, body {
   color: #888; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
 }
 
+/* ── Standard-Browser-Vorschlag (einmalig beim ersten Start) ───────── */
+#default-browser-overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(26,26,46,0.92);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(6px); padding: 20px;
+}
+#default-browser-dialog {
+  background: #fff; border-radius: 24px;
+  padding: 32px 28px; width: 100%; max-width: 380px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5); animation: pop-in .25s ease;
+}
+#default-browser-fox { font-size: 44px; margin-bottom: 10px; }
+#default-browser-dialog h2 { font-size: 19px; font-weight: 900; color: var(--foxi-brown); margin-bottom: 8px; }
+#default-browser-dialog p { font-size: 14px; color: #888; margin-bottom: 20px; }
+#dbp-later {
+  margin-top: 12px; background: none; border: none;
+  color: #888; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+
 /* ── Wiederherstellung + Bug-Bild ────────────────────────────────── */
 .hint-inline { font-weight: 400; color: #999; font-size: 12px; }
 #recovery-setup { margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 16px; }
