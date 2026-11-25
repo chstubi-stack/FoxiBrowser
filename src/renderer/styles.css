@@ -790,6 +790,8 @@ html, body {
 #parent-version { font-size: 11px; color: #444; font-weight: 700; letter-spacing: .3px; }
 #parent-website { font-size: 11px; color: var(--foxi-orange); font-weight: 700; text-decoration: none; opacity: .6; transition: opacity .15s; margin-left: auto; }
 #parent-website:hover { opacity: 1; }
+#parent-scripthive { font-size: 11px; color: #666; font-weight: 700; text-decoration: none; transition: color .15s; }
+#parent-scripthive:hover { color: var(--foxi-orange); }
 #btn-check-update {
   background: none; border: 1px solid #2A2A2A;
   color: #666; border-radius: 8px;

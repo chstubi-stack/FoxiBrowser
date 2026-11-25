@@ -1282,6 +1282,11 @@ document.getElementById('parent-website').addEventListener('click', (e) => {
   window.foxiAPI.openExternal('http://foxibrowser.de/');
 });
 
+document.getElementById('parent-scripthive').addEventListener('click', (e) => {
+  e.preventDefault();
+  window.foxiAPI.openExternal('https://www.scripthive.de/');
+});
+
 document.getElementById('btn-check-update').addEventListener('click', () => {
   window.foxiAPI.checkForUpdate();
   document.getElementById('update-text').textContent = '🔄 Suche nach Updates…';
