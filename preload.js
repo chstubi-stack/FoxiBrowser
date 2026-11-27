@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   getTimeStatus:  ()        => ipcRenderer.invoke('get-time-status'),
   getUsageWeek:   ()        => ipcRenderer.invoke('get-usage-week'),
   resetUsageToday:()        => ipcRenderer.invoke('reset-usage-today'),
+  unlockChild:    ()        => ipcRenderer.invoke('unlock-child'),
   // App-Version
   getVersion:     ()        => ipcRenderer.invoke('get-version'),
   // Update

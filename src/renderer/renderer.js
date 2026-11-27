@@ -105,6 +105,7 @@ function showBrowser(url) {
 }
 
 function showBlocked(data) {
+  if (timeLimitReached) { showTimeLimitPage(); return; }
   lastBlockedByMain = true;
   hideAll();
   blockedPage.classList.remove('hidden');
@@ -136,6 +137,13 @@ function showTimeLimitPage() {
   hideAll();
   timeLimitPage.classList.remove('hidden');
   pauseWebviewMedia();
+  // Seite wirklich entladen (nicht nur verstecken) – sonst läuft z.B. YouTube
+  // im Hintergrund weiter oder lässt sich per Leertaste wieder starten.
+  try { webview.stop(); } catch (_) {}
+  try { webview.loadURL('about:blank'); } catch (_) {}
+  try { webview.blur(); } catch (_) {}
+  addressBar.value = '';
+  window.foxiAPI.reportChildNav('', '');
 }
 
 function updateLockIcon(url) {
@@ -396,6 +404,7 @@ document.getElementById('btn-go-home-blocked').addEventListener('click', showHom
 document.getElementById('btn-time-parent').addEventListener('click', () => {
   openPinDialog('Eltern-Bereich', 'PIN eingeben um weiterzusurfen', async () => {
     await window.foxiAPI.resetUsageToday();
+    await window.foxiAPI.unlockChild();
     timeLimitReached = false;
     showHome();
   }, () => {});
@@ -1253,7 +1262,9 @@ window.foxiAPI.onPopupRedirect(url => {
 });
 
 window.foxiAPI.onUpdateDownloaded(info => {
-  document.getElementById('update-text').textContent = `✅ Update ${info.version} bereit!`;
+  document.getElementById('update-text').textContent = info.autoInstallSeconds
+    ? `✅ Update ${info.version} wird in ${info.autoInstallSeconds} s automatisch installiert…`
+    : `✅ Update ${info.version} bereit!`;
   updateProgressBar.style.width = '100%';
   updateProgressLabel.textContent = '100%';
   setTimeout(() => {

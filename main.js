@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, session, screen, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, session, screen, shell, Menu, webContents } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const http  = require('http');
@@ -118,6 +118,29 @@ let warningSent5min = false;
 let warningSent1min = false;
 let timeLimitActive = false;
 
+// ── KIND-SPERRE (Pause / Zeitlimit) ──────────────────────────────────────────
+// Früher wurde bei Pause/Zeitlimit das Kind-Webview nur per CSS ausgeblendet –
+// die Seite lief dahinter weiter (YouTube-Autoplay, Ton, Leertaste startete das
+// Video wieder). Jetzt wird das Webview hart geleert + stummgeschaltet und der
+// Hauptprozess lässt im gesperrten Zustand KEINE Requests der Kind-Session durch.
+function isChildLocked() {
+  return remotePaused || timeLimitActive;
+}
+function getChildContents() {
+  return webContents.getAllWebContents().filter(wc => {
+    try { return !wc.isDestroyed() && wc.getType() === 'webview'; } catch (_) { return false; }
+  });
+}
+function applyChildLock(locked) {
+  for (const wc of getChildContents()) {
+    try { wc.setAudioMuted(locked); } catch (_) {}
+    if (locked) {
+      try { wc.stop(); } catch (_) {}
+      try { wc.loadURL('about:blank'); } catch (_) {}
+    }
+  }
+}
+
 async function getLimitMinutes() {
   const s = await getStore();
   const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
@@ -167,9 +190,13 @@ async function checkTimeLimit() {
 
   if (remainingSecs <= 0 && !timeLimitActive) {
     timeLimitActive = true;
+    applyChildLock(true);
     mainWindow.webContents.send('time-limit-reached');
   }
-  if (remainingSecs > 0) timeLimitActive = false;
+  if (remainingSecs > 0 && timeLimitActive) {
+    timeLimitActive = false;
+    if (!remotePaused) applyChildLock(false);
+  }
 }
 
 // ── HAUPTFENSTER ─────────────────────────────────────────────────────────────
@@ -270,6 +297,8 @@ async function createWindow() {
     try {
       const url = new URL(details.url);
       if (!ALLOWED_PROTOCOLS.has(url.protocol)) { callback({ cancel: true }); return; }
+      // Pause/Zeitlimit aktiv → im Kind-Webview lädt gar nichts mehr
+      if (isChildLocked()) { callback({ cancel: true }); return; }
       if (isDomainBlocked(url.hostname)) {
         callback({ cancel: true });
         if (details.resourceType === 'mainFrame' && mainWindow && !mainWindow.isDestroyed()) {
@@ -328,6 +357,7 @@ async function createWindow() {
     // Eine vorher per Fernzugriff gesetzte Pause übersteht so einen Neustart
     // von FoxiBrowser (siehe get-time-status für die eigentliche PIN-Sperre).
     remotePaused = !!settings.remotePaused;
+    if (remotePaused) applyChildLock(true);
     if (remotePaused && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('remote-pause');
     }
@@ -366,7 +396,15 @@ function startAutoUpdater() {
     autoUpdater.on('update-downloaded', info => {
       console.log('[FoxiBrowser] Update heruntergeladen:', info.version);
       if (mainWindow && !mainWindow.isDestroyed())
-        mainWindow.webContents.send('update-downloaded', { version: info.version });
+        mainWindow.webContents.send('update-downloaded', { version: info.version, autoInstallSeconds: 15 });
+      // Automatisch installieren: kurzer Hinweis im Browser, dann stilles
+      // Installieren + Neustart. Pause/Zeitlimit liegen im Store und greifen
+      // nach dem Neustart sofort wieder (get-time-status).
+      setTimeout(() => {
+        try { autoUpdater.quitAndInstall(true, true); } catch (e) {
+          console.warn('[FoxiBrowser] Auto-Installation fehlgeschlagen:', e.message);
+        }
+      }, 15000);
     });
 
     autoUpdater.on('error', e => console.warn('[FoxiBrowser] Updater-Fehler:', e.message));
@@ -386,6 +424,7 @@ let remoteServer     = null;
 let remotePaused     = false;
 let currentChildUrl  = '';
 let currentChildTitle = '';
+let liveFrameCache    = null;   // { time, jpeg } – drosselt capturePage bei mehreren Zuschauern
 
 // Merkt eine per Fernzugriff ausgelöste Pause im Store, damit sie nicht durch
 // Schließen+Neuöffnen des Browsers verloren geht (gleiches Problem wie beim
@@ -695,6 +734,7 @@ function remoteMainHtml(data) {
   <button class="tab active" data-tab="time" onclick="showTab('time',this)">⏰ Nutzungszeit</button>
   <button class="tab" data-tab="history" onclick="showTab('history',this)">📋 Verlauf</button>
   <button class="tab" data-tab="favorites" onclick="showTab('favorites',this)">🏠 Startseite</button>
+  <button class="tab" data-tab="live" onclick="showTab('live',this)">👀 Live</button>
   <button class="tab" data-tab="chat" id="chat-tab-btn" onclick="showTab('chat',this)">💬 Nachricht</button>
   <button class="tab" data-tab="settings" onclick="showTab('settings',this)">⚙️ Einstellungen</button>
 </div>
@@ -788,6 +828,20 @@ function remoteMainHtml(data) {
   </div>
 </div>
 
+<div id="tab-live" class="panel">
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap">
+      <h2 style="margin-bottom:0">👀 Live-Ansicht</h2>
+      <span id="live-state" style="font-size:.82rem;color:#888">Verbinde…</span>
+    </div>
+    <div id="live-wrap" style="position:relative;width:100%;background:#111;border-radius:10px;overflow:hidden;line-height:0">
+      <img id="live-img" alt="" style="width:100%;height:auto;display:block;min-height:120px">
+      <div id="live-cursor" style="display:none;position:absolute;left:0;top:0;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:rgba(255,107,53,.35);border:3px solid #FF6B35;box-shadow:0 0 0 3px rgba(255,255,255,.7);pointer-events:none;transition:left .25s linear,top .25s linear"></div>
+    </div>
+    <p style="font-size:.8rem;color:#888;margin-top:10px;line-height:1.4">Zeigt das FoxiBrowser-Fenster des Kindes. Der orange Kreis ist der Mauszeiger (grau = Maus außerhalb des Fensters). Wird nur aktualisiert, solange dieser Tab offen ist.</p>
+  </div>
+</div>
+
 <div id="tab-chat" class="panel">
   <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 220px);min-height:300px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
@@ -827,6 +881,42 @@ function showTab(id, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-' + id).classList.add('active');
   btn.classList.add('active');
+  if (id === 'live') startLive(); else stopLive();
+}
+
+// ── Live-Ansicht: Bild ca. alle 1,5 s, Mauszeiger ca. alle 0,3 s ──
+let liveImgTimer = null, liveCurTimer = null, liveImgBusy = false;
+function startLive() {
+  if (liveImgTimer) return;
+  liveFrame(); liveCursor();
+  liveImgTimer = setInterval(liveFrame, 1500);
+  liveCurTimer = setInterval(liveCursor, 300);
+}
+function stopLive() {
+  clearInterval(liveImgTimer); clearInterval(liveCurTimer);
+  liveImgTimer = liveCurTimer = null;
+}
+function liveFrame() {
+  if (liveImgBusy || document.hidden) return;
+  liveImgBusy = true;
+  const img = new Image();
+  img.onload = function () { document.getElementById('live-img').src = img.src; liveImgBusy = false; };
+  img.onerror = function () { liveImgBusy = false; document.getElementById('live-state').textContent = '⚠️ Kein Bild verfügbar'; };
+  img.src = '/api/live-frame?t=' + Date.now();
+}
+function liveCursor() {
+  if (document.hidden) return;
+  fetch('/api/live-cursor', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+    const c = document.getElementById('live-cursor');
+    const st = document.getElementById('live-state');
+    if (!d.ok) { c.style.display = 'none'; st.textContent = d.minimized ? '🗕 Fenster minimiert' : '⚠️ Fenster nicht verfügbar'; return; }
+    const x = Math.min(100, Math.max(0, d.x * 100)), y = Math.min(100, Math.max(0, d.y * 100));
+    c.style.display = 'block';
+    c.style.left = x + '%'; c.style.top = y + '%';
+    c.style.borderColor = d.inside ? '#FF6B35' : '#999';
+    c.style.background  = d.inside ? 'rgba(255,107,53,.35)' : 'rgba(150,150,150,.3)';
+    st.textContent = (d.focused ? '🟢 Fenster aktiv' : '⚪ Fenster im Hintergrund') + (d.inside ? ' · Maus im Fenster' : ' · Maus außerhalb');
+  }).catch(function () { document.getElementById('live-state').textContent = '⚠️ Verbindung verloren'; });
 }
 function selectAge(age) {
   document.querySelectorAll('.age-card').forEach(c => c.classList.remove('selected'));
@@ -1148,9 +1238,11 @@ async function startRemoteServer() {
       const form = parseForm(await readBody(req));
       if (form.action === 'pause') {
         remotePaused = true;
+        applyChildLock(true);
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-pause');
       } else if (form.action === 'resume') {
         remotePaused = false;
+        if (!timeLimitActive) applyChildLock(false);
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-resume');
       }
       await setRemotePausedPersisted(remotePaused);
@@ -1237,6 +1329,43 @@ async function startRemoteServer() {
       }
       res.writeHead(302, { Location: '/#favorites' });
       res.end();
+      return;
+    }
+
+    // ── Live-Ansicht: Mauszeiger-Position relativ zum Fensterinhalt ─
+    if (url === '/api/live-cursor' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMinimized()) {
+        res.end(JSON.stringify({ ok: false, minimized: !!(mainWindow && !mainWindow.isDestroyed() && mainWindow.isMinimized()) }));
+        return;
+      }
+      const p = screen.getCursorScreenPoint();
+      const b = mainWindow.getContentBounds();
+      const rx = (p.x - b.x) / b.width, ry = (p.y - b.y) / b.height;
+      res.end(JSON.stringify({
+        ok: true, x: rx, y: ry,
+        inside: rx >= 0 && rx <= 1 && ry >= 0 && ry <= 1,
+        focused: mainWindow.isFocused(),
+      }));
+      return;
+    }
+
+    // ── Live-Ansicht: Bild des Browserfensters (JPEG, max. 1000 px breit) ─
+    if (url === '/api/live-frame' && req.method === 'GET') {
+      try {
+        if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMinimized()) throw new Error('kein Fenster');
+        const now = Date.now();
+        if (!liveFrameCache || now - liveFrameCache.time > 1000) {
+          let image = await mainWindow.webContents.capturePage();
+          if (image.getSize().width > 1000) image = image.resize({ width: 1000, quality: 'good' });
+          liveFrameCache = { time: now, jpeg: image.toJPEG(60) };
+        }
+        res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' });
+        res.end(liveFrameCache.jpeg);
+      } catch (_) {
+        res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('nicht verfügbar');
+      }
       return;
     }
 
@@ -1715,6 +1844,19 @@ ipcMain.handle('reset-usage-today', async () => {
   const data = s.get('usageData', {});
   delete data[todayKey()];
   s.set('usageData', data);
+  // Cache sofort angleichen, sonst bliebe die Sperre bis zum nächsten 10-s-Sync aktiv
+  _cachedUsedSeconds = 0;
+  if (usageStartTime) usageStartTime = Date.now();
+  timeLimitActive = false;
+  if (!remotePaused) applyChildLock(false);
+});
+// Eltern geben am Gerät per PIN frei → hebt auch eine Fernzugriffs-Pause auf,
+// sonst würde der Hauptprozess weiter alle Kind-Requests blockieren.
+ipcMain.handle('unlock-child', async () => {
+  remotePaused = false;
+  await setRemotePausedPersisted(false);
+  timeLimitActive = false;
+  applyChildLock(false);
 });
 
 // Aktuelle Seite des Kindes tracken
