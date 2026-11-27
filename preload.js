@@ -35,6 +35,9 @@ contextBridge.exposeInMainWorld('foxiAPI', {
   getUsageWeek:   ()        => ipcRenderer.invoke('get-usage-week'),
   resetUsageToday:()        => ipcRenderer.invoke('reset-usage-today'),
   unlockChild:    ()        => ipcRenderer.invoke('unlock-child'),
+  clearEmergency: (pin)     => ipcRenderer.invoke('clear-emergency', pin),
+  reportView:     (view)    => ipcRenderer.send('report-view', view),
+  onEmergencyLock:(cb)      => ipcRenderer.on('emergency-lock', () => cb()),
   // App-Version
   getVersion:     ()        => ipcRenderer.invoke('get-version'),
   // Update

@@ -124,14 +124,85 @@ let timeLimitActive = false;
 // Video wieder). Jetzt wird das Webview hart geleert + stummgeschaltet und der
 // Hauptprozess lässt im gesperrten Zustand KEINE Requests der Kind-Session durch.
 function isChildLocked() {
-  return remotePaused || timeLimitActive;
+  return remotePaused || timeLimitActive || emergencyLock;
 }
+
+// ── NOTZUSTAND ───────────────────────────────────────────────────────────────
+// Erkennt, wenn trotz aktiver Sperre (Pause/Zeitlimit) im Kind-Webview etwas
+// lädt, Ton läuft oder der Renderer wieder Inhalte zeigt (= Umgehung durch Bug
+// o.ä.). Dann schaltet FoxiBrowser in den Notzustand: alles gesperrt, Freigabe
+// NUR per Eltern-PIN am Gerät. Bleibt auch über einen Neustart bestehen.
+// Nach dem Sperren gibt es eine Schonfrist, damit Nachzügler der gerade
+// entladenen Seite keinen Fehlalarm auslösen.
+const LOCK_GRACE_MS = 6000;
+let emergencyLock = false;
+let lockSince     = 0;
+let lastRendererView = '';
+
+function lockGracePassed() {
+  return lockSince && (Date.now() - lockSince) > LOCK_GRACE_MS;
+}
+async function triggerEmergency(reason) {
+  if (emergencyLock) return;
+  emergencyLock = true;
+  console.warn('[FoxiBrowser] NOTZUSTAND ausgelöst:', reason);
+  applyChildLock(true);
+  try {
+    const s = await getStore();
+    const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
+    settings.emergencyLock   = true;
+    settings.emergencyReason = reason;
+    settings.emergencyAt     = new Date().toISOString();
+    s.set('settings', settings);
+  } catch (_) {}
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('emergency-lock');
+}
+async function clearEmergency() {
+  emergencyLock = false;
+  const s = await getStore();
+  const settings = s.get('settings', { pin: '1234', timeLimitMinutes: 0 });
+  delete settings.emergencyLock; delete settings.emergencyReason; delete settings.emergencyAt;
+  s.set('settings', settings);
+  if (!remotePaused && !timeLimitActive) applyChildLock(false);
+  else lockSince = Date.now();
+}
+// Wächter: prüft alle 2 s, ob die Sperre wirklich greift
+// Verwarnsystem gegen Fehlalarme: Beim 1. Verdacht wird die Sperre einfach
+// erneut angewendet (z.B. falls eine IPC-Nachricht verloren ging). Erst wenn
+// der Verdacht danach weiter besteht (3 Prüfungen ≈ 6 s), folgt der Notzustand.
+let lockStrikes = 0;
+setInterval(() => {
+  if (emergencyLock || !(remotePaused || timeLimitActive) || !lockGracePassed()) { lockStrikes = 0; return; }
+  let reason = '';
+  for (const wc of getChildContents()) {
+    let url = '';
+    try { url = wc.getURL() || ''; } catch (_) {}
+    if (url && !url.startsWith('about:')) { reason = 'Seite trotz Sperre geladen: ' + url; break; }
+    try { if (wc.isCurrentlyAudible()) { reason = 'Ton trotz Sperre'; break; } } catch (_) {}
+  }
+  if (!reason && (lastRendererView === 'home' || lastRendererView === 'browser')) {
+    reason = 'Oberfläche trotz Sperre entsperrt (' + lastRendererView + ')';
+  }
+  if (!reason) { lockStrikes = 0; return; }
+  lockStrikes++;
+  if (lockStrikes === 1) {
+    applyChildLock(true);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(remotePaused ? 'remote-pause' : 'time-limit-reached');
+    }
+  } else if (lockStrikes >= 3) {
+    lockStrikes = 0;
+    triggerEmergency(reason);
+  }
+}, 2000);
 function getChildContents() {
   return webContents.getAllWebContents().filter(wc => {
     try { return !wc.isDestroyed() && wc.getType() === 'webview'; } catch (_) { return false; }
   });
 }
 function applyChildLock(locked) {
+  if (locked && !lockSince) lockSince = Date.now();
+  if (!locked) lockSince = 0;
   for (const wc of getChildContents()) {
     try { wc.setAudioMuted(locked); } catch (_) {}
     if (locked) {
@@ -195,7 +266,7 @@ async function checkTimeLimit() {
   }
   if (remainingSecs > 0 && timeLimitActive) {
     timeLimitActive = false;
-    if (!remotePaused) applyChildLock(false);
+    if (!remotePaused && !emergencyLock) applyChildLock(false);
   }
 }
 
@@ -298,7 +369,13 @@ async function createWindow() {
       const url = new URL(details.url);
       if (!ALLOWED_PROTOCOLS.has(url.protocol)) { callback({ cancel: true }); return; }
       // Pause/Zeitlimit aktiv → im Kind-Webview lädt gar nichts mehr
-      if (isChildLocked()) { callback({ cancel: true }); return; }
+      if (isChildLocked()) {
+        callback({ cancel: true });
+        if (details.resourceType === 'mainFrame' && !emergencyLock && lockGracePassed()) {
+          triggerEmergency('Seitenaufruf trotz Sperre: ' + details.url);
+        }
+        return;
+      }
       if (isDomainBlocked(url.hostname)) {
         callback({ cancel: true });
         if (details.resourceType === 'mainFrame' && mainWindow && !mainWindow.isDestroyed()) {
@@ -357,7 +434,8 @@ async function createWindow() {
     // Eine vorher per Fernzugriff gesetzte Pause übersteht so einen Neustart
     // von FoxiBrowser (siehe get-time-status für die eigentliche PIN-Sperre).
     remotePaused = !!settings.remotePaused;
-    if (remotePaused) applyChildLock(true);
+    emergencyLock = !!settings.emergencyLock;
+    if (remotePaused || emergencyLock) applyChildLock(true);
     if (remotePaused && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('remote-pause');
     }
@@ -711,6 +789,7 @@ function remoteMainHtml(data) {
   (function(){ var b=document.getElementById('theme-toggle-btn'); if(b) b.textContent = document.documentElement.getAttribute('data-theme')==='dark' ? '☀️' : '🌙'; })();
 </script>
 
+${emergencyLock ? `<div style="background:#c62828;color:#fff;padding:12px 20px;font-weight:800;font-size:.92rem;line-height:1.4">🚨 NOTZUSTAND: Es wurde versucht, die Sperre zu umgehen – FoxiBrowser hat alles gesperrt. Freigabe nur mit der Eltern-PIN direkt am Gerät.</div>` : ''}
 <div class="status-bar">
   <div class="status-dot ${paused ? 'paused' : 'active'}"></div>
   <span class="status-text">${paused ? '⏸ Pausiert' : '▶ Aktiv'}</span>
@@ -1242,7 +1321,7 @@ async function startRemoteServer() {
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-pause');
       } else if (form.action === 'resume') {
         remotePaused = false;
-        if (!timeLimitActive) applyChildLock(false);
+        if (!timeLimitActive && !emergencyLock) applyChildLock(false);
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('remote-resume');
       }
       await setRemotePausedPersisted(remotePaused);
@@ -1386,6 +1465,7 @@ async function startRemoteServer() {
       }
       const payload = {
         paused: remotePaused,
+        emergency: emergencyLock,
         childUrl: currentChildUrl,
         childTitle: currentChildTitle,
         usageToday,
@@ -1820,12 +1900,14 @@ ipcMain.handle('get-time-status', async () => {
   // damit eine per Fernzugriff gesetzte Pause den Renderer-Start genauso
   // race-frei blockiert wie ein abgelaufenes Tageslimit.
   const isRemotePaused = !!settings.remotePaused;
+  const isEmergency    = !!settings.emergencyLock;
   return {
     limitSeconds: limitSecs,
     usedSeconds: usedSecs,
     remainingSeconds: remainingSecs,
     remotePaused: isRemotePaused,
-    blocked: isRemotePaused || (limitMins > 0 && remainingSecs <= 0),
+    emergency: isEmergency,
+    blocked: isEmergency || isRemotePaused || (limitMins > 0 && remainingSecs <= 0),
   };
 });
 ipcMain.handle('get-usage-week',  async () => {
@@ -1848,7 +1930,7 @@ ipcMain.handle('reset-usage-today', async () => {
   _cachedUsedSeconds = 0;
   if (usageStartTime) usageStartTime = Date.now();
   timeLimitActive = false;
-  if (!remotePaused) applyChildLock(false);
+  if (!remotePaused && !emergencyLock) applyChildLock(false);
 });
 // Eltern geben am Gerät per PIN frei → hebt auch eine Fernzugriffs-Pause auf,
 // sonst würde der Hauptprozess weiter alle Kind-Requests blockieren.
@@ -1856,8 +1938,19 @@ ipcMain.handle('unlock-child', async () => {
   remotePaused = false;
   await setRemotePausedPersisted(false);
   timeLimitActive = false;
-  applyChildLock(false);
+  if (!emergencyLock) applyChildLock(false);
 });
+// Notzustand: nur per Eltern-PIN am Gerät aufhebbar (PIN prüft der Renderer
+// vorher über den normalen PIN-Dialog; hier zusätzlich serverseitig geprüft)
+ipcMain.handle('clear-emergency', async (_, pin) => {
+  const s = await getStore();
+  const settings = s.get('settings', { pin: '1234' });
+  if (String(pin) !== String(settings.pin || '1234')) return false;
+  await clearEmergency();
+  return true;
+});
+// Renderer meldet, welche Ansicht er gerade zeigt (für den Notzustand-Wächter)
+ipcMain.on('report-view', (_, view) => { lastRendererView = String(view || ''); });
 
 // Aktuelle Seite des Kindes tracken
 ipcMain.on('child-navigated', (_, { url, title }) => {

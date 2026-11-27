@@ -64,6 +64,7 @@ const DEFAULT_FAVORITES = AGE_PROFILES.mittel.favorites;
 let isHome           = true;
 let lastBlockedByMain= false;
 let timeLimitReached = false;
+let emergencyActive  = false;   // Notzustand (Sperre wurde umgangen) – nur per Eltern-PIN lösbar
 let currentFavorites = [...DEFAULT_FAVORITES];
 let pendingUrl       = null;   // URL die nach PIN-Eingabe geöffnet werden soll
 let pinCallback      = null;   // Funktion die nach erfolgreicher PIN-Eingabe aufgerufen wird
@@ -81,7 +82,9 @@ function hideAll() {
 }
 
 function showHome() {
+  if (emergencyActive) { showEmergency(); return; }
   if (timeLimitReached) { showTimeLimitPage(); return; }
+  window.foxiAPI.reportView('home');
   isHome = true;
   hideAll();
   homePage.classList.remove('hidden');
@@ -93,7 +96,9 @@ function showHome() {
 }
 
 function showBrowser(url) {
+  if (emergencyActive) { showEmergency(); return; }
   if (timeLimitReached) { showTimeLimitPage(); return; }
+  window.foxiAPI.reportView('browser');
   isHome = false;
   hideAll();
   webview.classList.remove('hidden');
@@ -105,7 +110,9 @@ function showBrowser(url) {
 }
 
 function showBlocked(data) {
+  if (emergencyActive) { showEmergency(); return; }
   if (timeLimitReached) { showTimeLimitPage(); return; }
+  window.foxiAPI.reportView('blocked');
   lastBlockedByMain = true;
   hideAll();
   blockedPage.classList.remove('hidden');
@@ -132,18 +139,36 @@ function pauseWebviewMedia() {
   try { webview.executeJavaScript(code).catch(() => {}); } catch (_) {}
 }
 
-function showTimeLimitPage() {
-  timeLimitReached = true;
-  hideAll();
-  timeLimitPage.classList.remove('hidden');
+// Seite wirklich entladen (nicht nur verstecken) – sonst läuft z.B. YouTube
+// im Hintergrund weiter oder lässt sich per Leertaste wieder starten.
+function unloadWebview() {
   pauseWebviewMedia();
-  // Seite wirklich entladen (nicht nur verstecken) – sonst läuft z.B. YouTube
-  // im Hintergrund weiter oder lässt sich per Leertaste wieder starten.
   try { webview.stop(); } catch (_) {}
   try { webview.loadURL('about:blank'); } catch (_) {}
   try { webview.blur(); } catch (_) {}
   addressBar.value = '';
   window.foxiAPI.reportChildNav('', '');
+}
+
+function showEmergency() {
+  emergencyActive  = true;
+  timeLimitReached = true;
+  window.foxiAPI.reportView('emergency');
+  hideAll();
+  unloadWebview();
+  try { document.getElementById('parent-panel').classList.add('hidden'); } catch (_) {}
+  try { hideCtxMenu(); } catch (_) {}
+  document.body.classList.add('emergency');
+  document.getElementById('emergency-overlay').classList.remove('hidden');
+}
+
+function showTimeLimitPage() {
+  if (emergencyActive) { showEmergency(); return; }
+  timeLimitReached = true;
+  window.foxiAPI.reportView('locked');
+  hideAll();
+  timeLimitPage.classList.remove('hidden');
+  unloadWebview();
 }
 
 function updateLockIcon(url) {
@@ -197,10 +222,11 @@ async function submitPin() {
     pinOverlay.classList.add('hidden');
     pinOverlay._onCancel = null;
     const cb = pinCallback;
+    const enteredPin = pinBuffer;
     pinCallback = null;
     pinBuffer = '';
     updatePinDots();
-    if (cb) cb();
+    if (cb) cb(enteredPin);
   } else {
     pinBuffer = '';
     updatePinDots();
@@ -409,6 +435,31 @@ document.getElementById('btn-time-parent').addEventListener('click', () => {
     showHome();
   }, () => {});
 });
+
+// Notzustand: Freigabe nur mit Eltern-PIN. Danach gilt wieder der normale
+// Zustand (eine laufende Pause / ein abgelaufenes Limit bleibt bestehen).
+document.getElementById('btn-emergency-parent').addEventListener('click', () => {
+  openPinDialog('Eltern-PIN', 'Notzustand aufheben', async (pin) => {
+    const ok = await window.foxiAPI.clearEmergency(pin);
+    if (!ok) return;
+    emergencyActive = false;
+    document.body.classList.remove('emergency');
+    document.getElementById('emergency-overlay').classList.add('hidden');
+    await applyTimeStatus();
+  }, () => {});
+});
+window.foxiAPI.onEmergencyLock(() => showEmergency());
+
+// Aktuellen Sperr-Status vom Hauptprozess holen und passende Ansicht zeigen
+async function applyTimeStatus() {
+  try {
+    const status = await window.foxiAPI.getTimeStatus();
+    if (status && status.emergency) { showEmergency(); return; }
+    if (status && status.blocked)   { showTimeLimitPage(); return; }
+    timeLimitReached = false;
+    showHome();
+  } catch (_) { showHome(); }
+}
 
 // Fenster-Steuerung
 document.getElementById('btn-minimize').addEventListener('click', () => window.foxiAPI.minimize());
@@ -1190,7 +1241,7 @@ function hideCtxMenu() {
 
 // Rechtsklick: Position kommt vom Hauptprozess (screen.getCursorScreenPoint)
 window.foxiAPI.onContextMenu(data => {
-  if (isHome) return;
+  if (isHome || emergencyActive || timeLimitReached) return;
   showCtxMenu(data.x, data.y, !!data.selectionText, !!data.isEditable);
 });
 
@@ -1358,8 +1409,8 @@ window.foxiAPI.onRemotePause(() => {
   showTimeLimitPage();
 });
 window.foxiAPI.onRemoteResume(() => {
-  timeLimitReached = false;
-  showHome();
+  // Nicht blind entsperren: Zeitlimit oder Notzustand können weiter aktiv sein
+  applyTimeStatus();
 });
 window.foxiAPI.onRemoteFavoritesUpdated(favs => {
   currentFavorites = favs;
@@ -1494,7 +1545,9 @@ loadFavorites();
 // sonst würde kurz die Startseite aufblitzen, bevor der 'time-limit-reached'-Push
 // vom Hauptprozess eintrifft.
 window.foxiAPI.getTimeStatus().then(status => {
-  if (status && status.blocked) {
+  if (status && status.emergency) {
+    showEmergency();
+  } else if (status && status.blocked) {
     timeLimitReached = true;
     showTimeLimitPage();
   } else {

@@ -101,6 +101,17 @@
     </div>
   </div>
 
+  <!-- NOTZUSTAND (Sperre wurde umgangen) – Freigabe nur per Eltern-PIN -->
+  <div id="emergency-overlay" class="hidden">
+    <div id="emergency-content">
+      <div style="font-size:84px">🛑</div>
+      <h2>Halt – FoxiBrowser ist gesperrt!</h2>
+      <p>Liebes Kind, es ist nicht richtig, was du getan hast.<br>
+         Sag bitte Mama oder Papa Bescheid, was du gemacht hast.</p>
+      <button id="btn-emergency-parent" class="big-btn">🔒 Eltern-PIN eingeben</button>
+    </div>
+  </div>
+
   <!-- WEBVIEW -->
   <webview id="browser-view"
            src="about:blank"
